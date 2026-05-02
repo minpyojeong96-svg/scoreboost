@@ -9,6 +9,7 @@ import problemRouter from './routes/problem.js'
 import telegramRouter from './routes/telegram.js'
 import chatRouter from './routes/chat.js'
 import reviewRouter from './routes/review.js'
+import adminRouter from './routes/admin.js'
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -60,6 +61,7 @@ app.use('/api/problem', problemRouter)
 app.use('/api/telegram', telegramRouter)
 app.use('/api/chat', requireAuth, chatRouter)
 app.use('/api/review', reviewRouter)
+app.use('/api/admin', requireAuth, adminRouter)
 
 app.use((err, _req, res, _next) => {
   const status = err.status || 500

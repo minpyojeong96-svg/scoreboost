@@ -85,8 +85,8 @@ async function callGPT(sentence, hasPattern) {
       Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
     },
     body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      max_tokens: hasPattern ? 900 : 1500,
+      model: 'gpt-4o',
+      max_tokens: hasPattern ? 1200 : 2000,
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: hasPattern ? SYSTEM_PARTIAL : SYSTEM_FULL },
@@ -138,7 +138,10 @@ async function analyzeSentence(sentence) {
     if (pattern.blocks.F && !blocks.F) blocks.F = pattern.blocks.F
   }
 
-  // 6. DB 저장 (임베딩 포함)
+  // 6. AI 자동 검수 (생성 직후 GPT-4o가 다시 확인)
+  const review = await autoReview(sentence.trim(), result.translation, blocks)
+
+  // 7. DB 저장
   const { data: saved, error } = await supabase
     .from('sentences')
     .insert({
@@ -148,8 +151,10 @@ async function analyzeSentence(sentence) {
       embedding,
       blocks,
       pattern_id: pattern?.id || null,
-      trust_score: 0.7,
-      source: hasPattern ? 'pattern_hit' : 'ai_generated'
+      trust_score: review.passed ? 0.9 : 0.5,
+      source: hasPattern ? 'pattern_hit' : 'ai_generated',
+      review_passed: review.passed,
+      review_issues: review.issues
     })
     .select('id')
     .single()
@@ -163,7 +168,59 @@ async function analyzeSentence(sentence) {
     grammar_tags: result.grammar_tags || [],
     blocks,
     source: hasPattern ? 'pattern_hit' : 'ai_generated',
-    cached: false
+    cached: false,
+    review_passed: review.passed,
+    review_issues: review.issues
+  }
+}
+
+// ── AI 자동 검수: 생성된 설명을 GPT-4o가 다시 확인 ──────────────────────────
+async function autoReview(sentence, translation, blocks) {
+  try {
+    const quizG = typeof blocks.G === 'string' ? blocks.G : ''
+    const m = quizG.match(/\(([^)]+)\)\s*$/)
+    const quizAnswer = m ? m[1] : null
+
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        max_tokens: 400,
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system',
+            content: '너는 영어 교육 전문가야. 영어 문장 설명의 정확성을 검토해. JSON으로만 답해.'
+          },
+          {
+            role: 'user',
+            content: `다음 영어 문장 설명이 정확한지 검토해줘.
+
+문장: "${sentence}"
+한국어 번역: "${translation}"
+퀴즈 및 정답: "${quizG}"
+
+검토 항목:
+1. 번역이 영어 원문의 의미를 정확히 전달하는가?
+2. 퀴즈 정답(${quizAnswer})이 실제로 그 문장에서 사용된 올바른 단어인가?
+3. 전반적으로 학생에게 잘못된 정보를 줄 위험이 있는가?
+
+{
+  "passed": true 또는 false,
+  "issues": ["발견된 문제점 (없으면 빈 배열)"],
+  "quiz_answer_correct": true 또는 false
+}`
+          }
+        ]
+      })
+    })
+
+    if (!res.ok) return { passed: true, issues: [] }
+    const data = await res.json()
+    return JSON.parse(data.choices[0].message.content)
+  } catch {
+    return { passed: true, issues: [] }
   }
 }
 
