@@ -42,12 +42,13 @@ const normalize = (s) => s.toLowerCase().trim().replace(/[.,!?;:]+$/, '')
 
 // ─── 정답 교정 TTS (천천히 → 정상) ──────────────────────────────────────────
 function speakCorrection(word) {
+  if (!window.speechSynthesis || !word) return
   window.speechSynthesis.cancel()
   const slow = new SpeechSynthesisUtterance(word)
   slow.lang = 'en-US'; slow.rate = 0.5
   const normal = new SpeechSynthesisUtterance(word)
   normal.lang = 'en-US'; normal.rate = 1.0
-  slow.onend = () => setTimeout(() => window.speechSynthesis.speak(normal), 700)
+  slow.onend = () => setTimeout(() => window.speechSynthesis?.speak(normal), 700)
   window.speechSynthesis.speak(slow)
 }
 
@@ -78,8 +79,9 @@ function VoiceQuiz({ text, quizStatus, onResult }) {
         setVoiceAttempts(next)
         if (next >= MAX_VOICE) setTimeout(() => setMode('text'), 1800)
       } else {
-        setTextAttempts(t => t + 1)
+        // 텍스트 오답 → 오답 처리 후 다음으로 이동 가능
         setTextInput('')
+        onResult('wrong', answer, heard)
       }
     }
   }
@@ -589,29 +591,22 @@ export default function Result() {
 
       {/* 이전/다음 네비 */}
       {results.length > 1 && (
-        <div className="flex flex-col shrink-0 border-t border-gray-100">
-          {cur?.blocks?.G && !quizMap[cur.id] && (
-            <p className="text-center text-xs text-orange-500 pt-2 pb-0.5">
-              🔒 퀴즈를 풀어야 다음으로 이동할 수 있어요
-            </p>
-          )}
-          <div className="flex items-center justify-between px-4 py-2">
-            <button
-              onClick={() => handleSentenceChange(Math.max(0, sidx - 1))}
-              disabled={sidx === 0}
-              className="px-4 py-2 text-sm text-gray-500 disabled:opacity-30"
-            >
-              ← 이전
-            </button>
-            <span className="text-xs text-gray-400">{sidx + 1} / {results.length}</span>
-            <button
-              onClick={() => handleSentenceChange(Math.min(results.length - 1, sidx + 1))}
-              disabled={sidx === results.length - 1 || !!(cur?.blocks?.G && !quizMap[cur.id])}
-              className="px-4 py-2 text-sm text-indigo-600 font-medium disabled:opacity-30"
-            >
-              다음 →
-            </button>
-          </div>
+        <div className="flex items-center justify-between px-4 py-2 border-t border-gray-100 shrink-0">
+          <button
+            onClick={() => handleSentenceChange(Math.max(0, sidx - 1))}
+            disabled={sidx === 0}
+            className="px-4 py-2 text-sm text-gray-500 disabled:opacity-30"
+          >
+            ← 이전
+          </button>
+          <span className="text-xs text-gray-400">{sidx + 1} / {results.length}</span>
+          <button
+            onClick={() => handleSentenceChange(Math.min(results.length - 1, sidx + 1))}
+            disabled={sidx === results.length - 1}
+            className="px-4 py-2 text-sm text-indigo-600 font-medium disabled:opacity-30"
+          >
+            다음 →
+          </button>
         </div>
       )}
     </div>
