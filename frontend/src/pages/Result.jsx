@@ -5,6 +5,30 @@ import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import ChatPanel from '../components/ChatPanel.jsx'
 
+// ─── TTS 훅 ──────────────────────────────────────────────────────────────────
+function useTTS() {
+  const [speaking, setSpeaking] = useState(false)
+
+  const speak = (text, lang = 'en-US', rate = 0.85) => {
+    if (!window.speechSynthesis) return
+    window.speechSynthesis.cancel()
+    const u = new SpeechSynthesisUtterance(text)
+    u.lang = lang
+    u.rate = rate
+    u.onstart = () => setSpeaking(true)
+    u.onend = () => setSpeaking(false)
+    u.onerror = () => setSpeaking(false)
+    window.speechSynthesis.speak(u)
+  }
+
+  const stop = () => {
+    window.speechSynthesis?.cancel()
+    setSpeaking(false)
+  }
+
+  return { speaking, speak, stop }
+}
+
 function parseG(text = '') {
   const m = text.match(/\(([^)]+)\)\s*$/)
   if (!m) return { question: text, answer: null }
@@ -95,13 +119,27 @@ function GQuiz({ text, quizStatus, onResult }) {
 // ─── 한 문장 카드 (모든 블록 펼쳐서 보여줌) ──────────────────────────────────
 function SentenceCard({ item, quizStatus, onQuizResult }) {
   const b = item.blocks || {}
+  const { speaking, speak, stop } = useTTS()
 
   return (
     <div className="flex flex-col gap-3">
-      {/* 원문 */}
+      {/* 원문 + TTS 버튼 */}
       <div className="bg-white rounded-2xl border-2 border-gray-200 p-4">
-        <p className="text-xs font-bold text-gray-400 mb-1">영어 문장</p>
-        <p className="text-base font-bold text-gray-900 leading-relaxed">{item.sentence}</p>
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex-1">
+            <p className="text-xs font-bold text-gray-400 mb-1">영어 문장</p>
+            <p className="text-base font-bold text-gray-900 leading-relaxed">{item.sentence}</p>
+          </div>
+          <button
+            onClick={() => speaking ? stop() : speak(item.sentence)}
+            className={`shrink-0 w-11 h-11 rounded-full flex items-center justify-center text-xl shadow-sm transition-colors
+              ${speaking
+                ? 'bg-indigo-600 text-white animate-pulse'
+                : 'bg-indigo-50 text-indigo-600 active:bg-indigo-100'}`}
+          >
+            {speaking ? '⏹' : '🔊'}
+          </button>
+        </div>
         {item.grammar_tags?.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-2">
             {item.grammar_tags.map(t => (
@@ -254,6 +292,7 @@ export default function Result() {
   const cur = results[sidx]
 
   const handleSentenceChange = (idx) => {
+    window.speechSynthesis?.cancel()
     setSidx(idx)
     setAutoExplain(null)
     if (scrollRef.current) scrollRef.current.scrollTop = 0
