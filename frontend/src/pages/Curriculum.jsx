@@ -15,13 +15,15 @@ export default function Curriculum() {
     ? gradeData.topics[selectedTopic]
     : null
 
+  const pickRandom = (arr, n) => [...arr].sort(() => Math.random() - 0.5).slice(0, n)
+
   const handleStartAll = () => {
-    const sentences = gradeData.topics.flatMap(t => t.sentences)
-    navigate('/result', { state: { image: null, sentences } })
+    const all = gradeData.topics.flatMap(t => t.sentences)
+    navigate('/result', { state: { image: null, sentences: pickRandom(all, 10) } })
   }
 
   const handleStartTopic = () => {
-    navigate('/result', { state: { image: null, sentences: topicData.sentences } })
+    navigate('/result', { state: { image: null, sentences: pickRandom(topicData.sentences, 10) } })
   }
 
   // 학년 선택 화면
@@ -82,7 +84,7 @@ export default function Curriculum() {
           onClick={handleStartAll}
           className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold text-base shadow-md active:scale-95 transition-transform mb-4"
         >
-          📚 전체 문장 학습하기 ({gradeData.topics.reduce((s, t) => s + t.sentences.length, 0)}문장)
+          🎲 전체 단원 랜덤 10문장 학습
         </button>
 
         <p className="text-xs font-bold text-gray-400 mb-3">단원별 학습</p>
@@ -143,8 +145,11 @@ export default function Curriculum() {
         onClick={handleStartTopic}
         className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold text-base shadow-md active:scale-95 transition-transform"
       >
-        🚀 학습 시작하기
+        🎲 랜덤 10문장 학습하기
       </button>
+      <p className="text-center text-xs text-gray-400 mt-2">
+        {topicData.sentences.length}개 문장 중 무작위 10개 선택 · 매번 새로운 문제
+      </p>
     </div>
   )
 }

@@ -15,6 +15,10 @@ async function getEmbedding(text) {
     body: JSON.stringify({ model: 'text-embedding-3-small', input: text })
   })
   const data = await res.json()
+  if (!res.ok || !data.data?.[0]?.embedding) {
+    const msg = data.error?.message || `OpenAI Embedding 오류 (${res.status})`
+    throw Object.assign(new Error(msg), { status: 502 })
+  }
   return data.data[0].embedding
 }
 

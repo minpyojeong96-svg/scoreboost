@@ -160,6 +160,7 @@ export default function Result() {
       for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
         try {
           const { results: res } = await analyzeSentences(sentences)
+          if (!Array.isArray(res) || res.length === 0) throw new Error('서버에서 분석 결과를 받지 못했습니다')
           setResults(res)
           if (res[0]?.blocks) setTab(Object.keys(res[0].blocks)[0] || 'A')
           setPhase('ready')

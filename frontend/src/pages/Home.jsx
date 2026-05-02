@@ -1,7 +1,54 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
+
+const APP_URL = window.location.origin
+
+function QRModal({ onClose }) {
+  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(APP_URL)}&ecc=M&bgcolor=ffffff&color=4F46E5`
+  return (
+    <div
+      className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl p-6 max-w-xs w-full text-center shadow-xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <h2 className="text-lg font-bold text-gray-800 mb-1">📱 QR 코드로 접속</h2>
+        <p className="text-xs text-gray-400 mb-4">스마트폰 카메라로 스캔하면 바로 접속</p>
+
+        <div className="inline-block p-3 rounded-xl border-2 border-indigo-100 mb-4">
+          <img src={qrSrc} alt="ScoreBoost QR" width={220} height={220} className="block rounded-lg" />
+        </div>
+
+        <p className="text-xs font-bold text-indigo-600 mb-2">홈 화면 바로가기 추가 방법</p>
+        <div className="text-left text-xs text-gray-500 space-y-2 bg-gray-50 rounded-xl p-3 mb-4">
+          <div className="flex gap-2 items-start">
+            <span className="text-base">🤖</span>
+            <div>
+              <p className="font-medium text-gray-700">안드로이드 Chrome</p>
+              <p>브라우저 우상단 메뉴(⋮) → <strong>홈 화면에 추가</strong></p>
+            </div>
+          </div>
+          <div className="flex gap-2 items-start">
+            <span className="text-base">🍎</span>
+            <div>
+              <p className="font-medium text-gray-700">아이폰 Safari</p>
+              <p>하단 공유 버튼(□↑) → <strong>홈 화면에 추가</strong></p>
+            </div>
+          </div>
+        </div>
+
+        <p className="text-xs text-gray-300 mb-3 break-all">{APP_URL}</p>
+        <button onClick={onClose} className="w-full py-3 bg-gray-100 text-gray-600 rounded-xl font-medium">
+          닫기
+        </button>
+      </div>
+    </div>
+  )
+}
 
 const LEVEL_LABEL = {
   중1: '중학교 1학년', 중2: '중학교 2학년', 중3: '중학교 3학년',
@@ -22,6 +69,21 @@ export default function Home() {
   const { user }  = useAuth()
   const [stats, setStats]           = useState(null)
   const [schoolLevel, setSchoolLevel] = useState(null)
+  const [showQR, setShowQR]         = useState(false)
+  const [installPrompt, setInstallPrompt] = useState(null)
+
+  useEffect(() => {
+    const handler = e => { e.preventDefault(); setInstallPrompt(e) }
+    window.addEventListener('beforeinstallprompt', handler)
+    return () => window.removeEventListener('beforeinstallprompt', handler)
+  }, [])
+
+  const handleInstall = async () => {
+    if (!installPrompt) { setShowQR(true); return }
+    installPrompt.prompt()
+    const { outcome } = await installPrompt.userChoice
+    if (outcome === 'accepted') setInstallPrompt(null)
+  }
 
   useEffect(() => {
     if (!user) return
@@ -66,6 +128,8 @@ export default function Home() {
 
   return (
     <div className="flex flex-col h-full px-4 pt-5 pb-4 gap-4 overflow-y-auto">
+      {showQR && <QRModal onClose={() => setShowQR(false)} />}
+
       {/* 인사 + 학년 뱃지 */}
       <div className="flex items-start justify-between">
         <div>
@@ -179,6 +243,12 @@ export default function Home() {
           className="w-full py-3 bg-white border-2 border-indigo-200 text-indigo-600 rounded-2xl font-bold text-base active:scale-95 transition-transform"
         >
           📝 오답노트 보기
+        </button>
+        <button
+          onClick={() => setShowQR(true)}
+          className="w-full py-3 bg-white border-2 border-gray-200 text-gray-500 rounded-2xl font-medium text-sm active:scale-95 transition-transform"
+        >
+          📲 QR 코드로 공유 · 홈 화면 추가
         </button>
       </div>
     </div>
