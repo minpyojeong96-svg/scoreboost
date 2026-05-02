@@ -140,12 +140,18 @@ export default function Result() {
   const [sent, setSent] = useState(false)
 
   useEffect(() => {
-    if (!state?.image) { navigate('/camera', { replace: true }); return }
+    if (!state?.image && !state?.sentences) { navigate('/camera', { replace: true }); return }
     ;(async () => {
       try {
-        const ocr = await ocrImage(state.image)
-        if (ocr.retake) throw Object.assign(new Error(ocr.error), { retake: true })
-        const { results: res } = await analyzeSentences(ocr.sentences)
+        let sentences
+        if (state.sentences) {
+          sentences = state.sentences
+        } else {
+          const ocr = await ocrImage(state.image)
+          if (ocr.retake) throw Object.assign(new Error(ocr.error), { retake: true })
+          sentences = ocr.sentences
+        }
+        const { results: res } = await analyzeSentences(sentences)
         setResults(res)
         if (res[0]?.blocks) setTab(Object.keys(res[0].blocks)[0] || 'A')
         setPhase('ready')

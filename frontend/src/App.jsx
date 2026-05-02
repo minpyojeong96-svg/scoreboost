@@ -6,6 +6,7 @@ import Camera from './pages/Camera.jsx'
 import Result from './pages/Result.jsx'
 import WrongNote from './pages/WrongNote.jsx'
 import Profile from './pages/Profile.jsx'
+import Curriculum from './pages/Curriculum.jsx'
 import BottomNav from './components/BottomNav.jsx'
 
 function ProtectedRoute({ children }) {
@@ -34,6 +35,7 @@ function AppRoutes() {
           <Route path="/result" element={<ProtectedRoute><Result /></ProtectedRoute>} />
           <Route path="/wrong" element={<ProtectedRoute><WrongNote /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+          <Route path="/curriculum" element={<ProtectedRoute><Curriculum /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
