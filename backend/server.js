@@ -15,13 +15,17 @@ const PORT = process.env.PORT || 3000
 
 const ALLOWED_ORIGINS = [
   'http://localhost:5173',
-  process.env.FRONTEND_URL  // Vercel URL (예: https://scoreboost.vercel.app)
+  'http://localhost:3000',
+  process.env.FRONTEND_URL,
 ].filter(Boolean)
 
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true)
-    cb(new Error('CORS 차단'))
+    if (!origin) return cb(null, true)
+    if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true)
+    // vercel.app 서브도메인은 모두 허용 (배포 preview URL 포함)
+    if (/^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(origin)) return cb(null, true)
+    cb(new Error(`CORS 차단: ${origin}`))
   },
   credentials: true
 }))

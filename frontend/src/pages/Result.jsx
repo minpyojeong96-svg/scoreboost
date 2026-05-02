@@ -129,6 +129,7 @@ export default function Result() {
   const startTime = useRef(Date.now())
 
   const [phase, setPhase] = useState('loading')
+  const [loadingMsg, setLoadingMsg] = useState('문장 분석 중...')
   const [errMsg, setErrMsg] = useState('')
   const [results, setResults] = useState([])
   const [sidx, setSidx] = useState(0)
@@ -139,27 +140,53 @@ export default function Result() {
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
 
+  const fromCurriculum = !state?.image && !!state?.sentences
+
+  const runAnalysis = async () => {
+    setPhase('loading')
+    setLoadingMsg('문장 분석 중...')
+    try {
+      let sentences
+      if (state.sentences) {
+        sentences = state.sentences
+      } else {
+        const ocr = await ocrImage(state.image)
+        if (ocr.retake) throw Object.assign(new Error(ocr.error), { retake: true })
+        sentences = ocr.sentences
+      }
+
+      const MAX_RETRIES = 3
+      let lastErr
+      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+        try {
+          const { results: res } = await analyzeSentences(sentences)
+          setResults(res)
+          if (res[0]?.blocks) setTab(Object.keys(res[0].blocks)[0] || 'A')
+          setPhase('ready')
+          return
+        } catch (e) {
+          lastErr = e
+          if (e.message === 'Failed to fetch' && attempt < MAX_RETRIES - 1) {
+            setLoadingMsg(`서버 연결 중... Render 서버가 깨어나는 중입니다 (${attempt + 1}/${MAX_RETRIES}회 시도, 잠시만 기다려 주세요)`)
+            await new Promise(r => setTimeout(r, 8000))
+          } else {
+            throw e
+          }
+        }
+      }
+      throw lastErr
+    } catch (e) {
+      const msg = e.message === 'Failed to fetch'
+        ? '서버에 연결할 수 없습니다.\n\n① Render 백엔드가 완전히 잠든 경우 30초 후 다시 시도하세요.\n② Render 환경변수 FRONTEND_URL이 https://scoreboost-rust.vercel.app 인지 확인하세요.'
+        : (e.message || '분석 중 오류가 발생했습니다')
+      setErrMsg(msg)
+      setPhase('error')
+    }
+  }
+
   useEffect(() => {
     if (!state?.image && !state?.sentences) { navigate('/camera', { replace: true }); return }
-    ;(async () => {
-      try {
-        let sentences
-        if (state.sentences) {
-          sentences = state.sentences
-        } else {
-          const ocr = await ocrImage(state.image)
-          if (ocr.retake) throw Object.assign(new Error(ocr.error), { retake: true })
-          sentences = ocr.sentences
-        }
-        const { results: res } = await analyzeSentences(sentences)
-        setResults(res)
-        if (res[0]?.blocks) setTab(Object.keys(res[0].blocks)[0] || 'A')
-        setPhase('ready')
-      } catch (e) {
-        setErrMsg(e.message || '분석 중 오류가 발생했습니다')
-        setPhase('error')
-      }
-    })()
+    runAnalysis()
   }, [])
 
   const cur = results[sidx]
@@ -258,9 +285,9 @@ export default function Result() {
 
   if (phase === 'loading') {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4">
+      <div className="flex flex-col items-center justify-center h-full gap-4 px-6">
         <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-        <p className="text-gray-500 text-sm">문장 분석 중...</p>
+        <p className="text-gray-500 text-sm text-center whitespace-pre-wrap">{loadingMsg}</p>
       </div>
     )
   }
@@ -269,12 +296,18 @@ export default function Result() {
     return (
       <div className="flex flex-col items-center justify-center h-full px-6 gap-4">
         <span className="text-5xl">😅</span>
-        <p className="text-gray-700 text-center font-medium">{errMsg}</p>
+        <p className="text-gray-700 text-center font-medium whitespace-pre-wrap text-sm">{errMsg}</p>
         <button
-          onClick={() => navigate('/camera')}
+          onClick={runAnalysis}
           className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold"
         >
-          다시 촬영하기
+          🔄 다시 시도하기
+        </button>
+        <button
+          onClick={() => navigate(fromCurriculum ? '/curriculum' : '/camera')}
+          className="w-full py-3 bg-gray-100 text-gray-600 rounded-xl font-medium"
+        >
+          {fromCurriculum ? '← 교과서로 돌아가기' : '다시 촬영하기'}
         </button>
       </div>
     )
