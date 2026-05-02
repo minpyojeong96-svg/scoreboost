@@ -5,17 +5,6 @@ import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import ChatPanel from '../components/ChatPanel.jsx'
 
-const BLOCK_LABELS = { A: '해석', B: '단어', C: '구조', D: '문법', E: '이유', F: '비교', G: '문제' }
-const BLOCK_COLORS = {
-  A: 'bg-blue-50 border-blue-200',
-  B: 'bg-purple-50 border-purple-200',
-  C: 'bg-green-50 border-green-200',
-  D: 'bg-orange-50 border-orange-200',
-  E: 'bg-pink-50 border-pink-200',
-  F: 'bg-red-50 border-red-200',
-  G: 'bg-indigo-50 border-indigo-200'
-}
-
 function parseG(text = '') {
   const m = text.match(/\(([^)]+)\)\s*$/)
   if (!m) return { question: text, answer: null }
@@ -27,27 +16,7 @@ function parseG(text = '') {
 
 const normalize = (s) => s.toLowerCase().trim().replace(/[.,!?;:]+$/, '')
 
-// ─── 블록 탭 ──────────────────────────────────────────────────────────────────
-
-function BlockTabs({ blocks, active, onChange }) {
-  return (
-    <div className="flex gap-1 px-4 overflow-x-auto pb-1">
-      {Object.keys(blocks).map(k => (
-        <button
-          key={k}
-          onClick={() => onChange(k)}
-          className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors
-            ${active === k ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-500'}`}
-        >
-          {k} {BLOCK_LABELS[k]}
-        </button>
-      ))}
-    </div>
-  )
-}
-
-// ─── G블록 퀴즈 (userInput도 onResult에 전달) ─────────────────────────────────
-
+// ─── G블록 퀴즈 ───────────────────────────────────────────────────────────────
 function GQuiz({ text, quizStatus, onResult }) {
   const { question, answer } = parseG(text)
   const [input, setInput] = useState('')
@@ -62,7 +31,8 @@ function GQuiz({ text, quizStatus, onResult }) {
 
   if (quizStatus === 'correct') {
     return (
-      <div className="rounded-xl border-2 border-green-300 bg-green-50 p-4">
+      <div className="rounded-2xl border-2 border-green-300 bg-green-50 p-4">
+        <p className="text-xs font-bold text-green-600 mb-2">✏️ 퀴즈</p>
         <p className="text-sm text-gray-700 mb-3">{question}</p>
         <div className="flex items-center gap-2">
           <span className="text-2xl">✅</span>
@@ -74,7 +44,8 @@ function GQuiz({ text, quizStatus, onResult }) {
 
   if (quizStatus === 'wrong' || quizStatus === 'revealed') {
     return (
-      <div className="rounded-xl border-2 border-red-200 bg-red-50 p-4">
+      <div className="rounded-2xl border-2 border-red-200 bg-red-50 p-4">
+        <p className="text-xs font-bold text-red-500 mb-2">✏️ 퀴즈</p>
         <p className="text-sm text-gray-700 mb-3">{question}</p>
         <div className="flex items-center gap-2">
           <span className="text-2xl">{quizStatus === 'wrong' ? '❌' : '👀'}</span>
@@ -82,13 +53,14 @@ function GQuiz({ text, quizStatus, onResult }) {
             정답: <span className="font-bold font-mono">{answer}</span>
           </span>
         </div>
-        <p className="text-xs text-indigo-500 mt-2">💬 아래 선생님 채팅에서 이유를 확인하세요</p>
+        <p className="text-xs text-indigo-500 mt-2">💬 아래 선생님 채팅에서 이유를 물어보세요!</p>
       </div>
     )
   }
 
   return (
-    <div className={`rounded-xl border-2 p-4 ${BLOCK_COLORS.G}`}>
+    <div className="rounded-2xl border-2 border-indigo-200 bg-indigo-50 p-4">
+      <p className="text-xs font-bold text-indigo-500 mb-2">✏️ 퀴즈 — 빈칸을 채워보세요!</p>
       <p className="text-sm text-gray-700 mb-3 whitespace-pre-wrap">{question}</p>
       {answer ? (
         <div className="flex flex-col gap-2">
@@ -99,12 +71,12 @@ function GQuiz({ text, quizStatus, onResult }) {
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && submit()}
               placeholder="정답을 입력하세요"
-              className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
+              className="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400 bg-white"
             />
             <button
               onClick={submit}
               disabled={!input.trim()}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium disabled:opacity-40"
+              className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold disabled:opacity-40"
             >
               확인
             </button>
@@ -120,13 +92,92 @@ function GQuiz({ text, quizStatus, onResult }) {
   )
 }
 
-// ─── 메인 컴포넌트 ────────────────────────────────────────────────────────────
+// ─── 한 문장 카드 (모든 블록 펼쳐서 보여줌) ──────────────────────────────────
+function SentenceCard({ item, quizStatus, onQuizResult }) {
+  const b = item.blocks || {}
 
+  return (
+    <div className="flex flex-col gap-3">
+      {/* 원문 */}
+      <div className="bg-white rounded-2xl border-2 border-gray-200 p-4">
+        <p className="text-xs font-bold text-gray-400 mb-1">영어 문장</p>
+        <p className="text-base font-bold text-gray-900 leading-relaxed">{item.sentence}</p>
+        {item.grammar_tags?.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-2">
+            {item.grammar_tags.map(t => (
+              <span key={t} className="text-xs bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full font-medium">{t}</span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* A: 해석 */}
+      {b.A && (
+        <div className="bg-blue-50 rounded-2xl border-2 border-blue-200 p-4">
+          <p className="text-xs font-bold text-blue-500 mb-2">🗣️ 우리말 해석</p>
+          <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{b.A}</p>
+        </div>
+      )}
+
+      {/* B: 단어 */}
+      {b.B && (
+        <div className="bg-purple-50 rounded-2xl border-2 border-purple-200 p-4">
+          <p className="text-xs font-bold text-purple-500 mb-2">📖 단어 하나씩 뜯어보기</p>
+          <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{b.B}</p>
+        </div>
+      )}
+
+      {/* C: 구조 */}
+      {b.C && (
+        <div className="bg-green-50 rounded-2xl border-2 border-green-200 p-4">
+          <p className="text-xs font-bold text-green-600 mb-2">🔍 문장 구조 (주어/동사/목적어)</p>
+          <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{b.C}</p>
+        </div>
+      )}
+
+      {/* D: 문법 */}
+      {b.D && (
+        <div className="bg-orange-50 rounded-2xl border-2 border-orange-200 p-4">
+          <p className="text-xs font-bold text-orange-500 mb-2">📚 문법 설명</p>
+          <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{b.D}</p>
+        </div>
+      )}
+
+      {/* E: 이유 */}
+      {b.E && (
+        <div className="bg-pink-50 rounded-2xl border-2 border-pink-200 p-4">
+          <p className="text-xs font-bold text-pink-500 mb-2">💡 왜 이렇게 쓸까요?</p>
+          <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{b.E}</p>
+        </div>
+      )}
+
+      {/* F: 비교 */}
+      {b.F && (
+        <div className="bg-red-50 rounded-2xl border-2 border-red-200 p-4">
+          <p className="text-xs font-bold text-red-500 mb-2">⚠️ 이렇게 쓰면 틀려요!</p>
+          <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{b.F}</p>
+        </div>
+      )}
+
+      {/* G: 퀴즈 */}
+      {b.G && (
+        <GQuiz
+          text={b.G}
+          quizStatus={quizStatus}
+          onResult={onQuizResult}
+        />
+      )}
+    </div>
+  )
+}
+
+// ─── 메인 컴포넌트 ────────────────────────────────────────────────────────────
 export default function Result() {
   const navigate = useNavigate()
   const { state } = useLocation()
   const { user } = useAuth()
   const startTime = useRef(Date.now())
+  const scrollRef = useRef(null)
 
   const [phase, setPhase] = useState('loading')
   const [loadingMsg, setLoadingMsg] = useState('문장 분석 중...')
@@ -134,7 +185,6 @@ export default function Result() {
   const [errMsg, setErrMsg] = useState('')
   const [results, setResults] = useState([])
   const [sidx, setSidx] = useState(0)
-  const [tab, setTab] = useState('A')
   const [quizMap, setQuizMap] = useState({})
   const [autoExplain, setAutoExplain] = useState(null)
   const [name, setName] = useState('')
@@ -143,7 +193,6 @@ export default function Result() {
 
   const fromCurriculum = !state?.image && !!state?.sentences
 
-  // 로딩 중 경과 시간 타이머
   useEffect(() => {
     if (phase !== 'loading') { setElapsed(0); return }
     setElapsed(0)
@@ -164,7 +213,6 @@ export default function Result() {
         sentences = ocr.sentences
       }
 
-      // 커리큘럼 경로는 최대 10문장 (비용·속도 제한)
       const toAnalyze = fromCurriculum && sentences.length > 10
         ? [...sentences].sort(() => Math.random() - 0.5).slice(0, 10)
         : sentences
@@ -176,13 +224,12 @@ export default function Result() {
           const { results: res } = await analyzeSentences(toAnalyze)
           if (!Array.isArray(res) || res.length === 0) throw new Error('서버에서 분석 결과를 받지 못했습니다')
           setResults(res)
-          if (res[0]?.blocks) setTab(Object.keys(res[0].blocks)[0] || 'A')
           setPhase('ready')
           return
         } catch (e) {
           lastErr = e
           if (e.message === 'Failed to fetch' && attempt < MAX_RETRIES - 1) {
-            setLoadingMsg(`서버 연결 중... Render 서버가 깨어나는 중입니다 (${attempt + 1}/${MAX_RETRIES}회 시도, 잠시만 기다려 주세요)`)
+            setLoadingMsg(`서버 연결 중... (${attempt + 1}/${MAX_RETRIES}회 시도, 잠시만 기다려 주세요)`)
             await new Promise(r => setTimeout(r, 8000))
           } else {
             throw e
@@ -192,7 +239,7 @@ export default function Result() {
       throw lastErr
     } catch (e) {
       const msg = e.message === 'Failed to fetch'
-        ? '서버에 연결할 수 없습니다.\n\n① Render 백엔드가 완전히 잠든 경우 30초 후 다시 시도하세요.\n② Render 환경변수 FRONTEND_URL이 https://scoreboost-rust.vercel.app 인지 확인하세요.'
+        ? '서버에 연결할 수 없습니다.\n잠시 후 다시 시도해주세요.'
         : (e.message || '분석 중 오류가 발생했습니다')
       setErrMsg(msg)
       setPhase('error')
@@ -209,37 +256,32 @@ export default function Result() {
   const handleSentenceChange = (idx) => {
     setSidx(idx)
     setAutoExplain(null)
-    const blocks = results[idx]?.blocks || {}
-    const keys = Object.keys(blocks)
-    if (!keys.includes(tab)) setTab(keys[0] || 'A')
+    if (scrollRef.current) scrollRef.current.scrollTop = 0
   }
 
-  const handleQuizResult = async (resultItem, status, correctAnswer, userInput) => {
-    setQuizMap(prev => ({ ...prev, [resultItem.id]: status }))
+  const handleQuizResult = async (status, correctAnswer, userInput) => {
+    setQuizMap(prev => ({ ...prev, [cur.id]: status }))
 
     if (status !== 'correct') {
-      // 오답 자동 설명 트리거
       setAutoExplain({ userInput, correctAnswer })
-
-      // Supabase에 오답 저장
       if (user) {
-        const grammarTag = resultItem.grammar_tags?.[0] || '기타'
+        const grammarTag = cur.grammar_tags?.[0] || '기타'
         const { data: existing } = await supabase
           .from('wrong_notes')
           .select('id')
           .eq('user_id', user.id)
-          .eq('sentence_id', resultItem.id)
+          .eq('sentence_id', cur.id)
           .eq('grammar_tag', grammarTag)
           .maybeSingle()
 
         if (!existing) {
           await supabase.from('wrong_notes').insert({
             user_id: user.id,
-            sentence_id: resultItem.id,
-            sentence: resultItem.sentence,
-            translation: resultItem.translation,
+            sentence_id: cur.id,
+            sentence: cur.sentence,
+            translation: cur.translation,
             grammar_tag: grammarTag,
-            blocks: resultItem.blocks,
+            blocks: cur.blocks,
           })
         }
       }
@@ -249,7 +291,6 @@ export default function Result() {
   const quizSentences = results.filter(r => r.blocks?.G !== undefined)
   const allAttempted = quizSentences.length > 0 &&
     quizSentences.every(r => quizMap[r.id] !== undefined)
-
   const correctCount = Object.values(quizMap).filter(v => v === 'correct').length
   const score = quizSentences.length > 0
     ? Math.round((correctCount / quizSentences.length) * 100)
@@ -278,9 +319,7 @@ export default function Result() {
       const tagCount = {}
       wrongItems.forEach(w => { tagCount[w.grammar_tag] = (tagCount[w.grammar_tag] || 0) + 1 })
       const recommendedTags = Object.entries(tagCount)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 3)
-        .map(([tag]) => tag)
+        .sort((a, b) => b[1] - a[1]).slice(0, 3).map(([tag]) => tag)
 
       await sendToTelegram({
         chat_id: profile.telegram_id,
@@ -298,35 +337,31 @@ export default function Result() {
     }
   }
 
+  // ─── 로딩 화면 ───────────────────────────────────────────────────────────────
   if (phase === 'loading') {
     const steps = [
-      { until: 5,  icon: '🔍', msg: 'GPT가 문장을 읽고 있어요...' },
-      { until: 12, icon: '✍️', msg: '문법을 분석하고 해석을 만드는 중이에요' },
-      { until: 20, icon: '📝', msg: '퀴즈와 설명을 정리하고 있어요' },
-      { until: 30, icon: '⏳', msg: '거의 다 됐어요! 조금만 기다려 주세요' },
+      { until: 5,        icon: '🔍', msg: 'GPT가 문장을 읽고 있어요...' },
+      { until: 12,       icon: '✍️', msg: '문법을 분석하고 해석을 만드는 중이에요' },
+      { until: 20,       icon: '📝', msg: '퀴즈와 설명을 정리하고 있어요' },
+      { until: 30,       icon: '⏳', msg: '거의 다 됐어요! 조금만 기다려 주세요' },
       { until: Infinity, icon: '🐢', msg: '시간이 좀 걸리네요... 서버가 열심히 일하는 중이에요' },
     ]
     const step = steps.find(s => elapsed < s.until)
 
     return (
       <div className="flex flex-col items-center justify-center h-full gap-5 px-6">
-        {/* 스피너 */}
         <div className="relative">
           <div className="w-16 h-16 border-4 border-indigo-100 rounded-full" />
           <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin absolute inset-0" />
           <span className="absolute inset-0 flex items-center justify-center text-2xl">{step.icon}</span>
         </div>
-
-        {/* 경과 시간 */}
         <div className="text-center">
           <p className="text-indigo-600 font-bold text-lg">{elapsed}초</p>
           <p className="text-gray-500 text-sm mt-1">{step.msg}</p>
           {loadingMsg !== '문장 분석 중...' && (
-            <p className="text-orange-500 text-xs mt-2 whitespace-pre-wrap">{loadingMsg}</p>
+            <p className="text-orange-500 text-xs mt-2">{loadingMsg}</p>
           )}
         </div>
-
-        {/* 진행 힌트 */}
         <div className="bg-indigo-50 rounded-xl px-4 py-3 text-center max-w-xs">
           <p className="text-xs text-indigo-600">
             💡 처음 분석은 <strong>20~30초</strong> 걸려요<br />
@@ -337,15 +372,13 @@ export default function Result() {
     )
   }
 
+  // ─── 에러 화면 ───────────────────────────────────────────────────────────────
   if (phase === 'error') {
     return (
       <div className="flex flex-col items-center justify-center h-full px-6 gap-4">
         <span className="text-5xl">😅</span>
         <p className="text-gray-700 text-center font-medium whitespace-pre-wrap text-sm">{errMsg}</p>
-        <button
-          onClick={runAnalysis}
-          className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold"
-        >
+        <button onClick={runAnalysis} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold">
           🔄 다시 시도하기
         </button>
         <button
@@ -358,11 +391,12 @@ export default function Result() {
     )
   }
 
+  // ─── 결과 화면 ───────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col h-full">
-      {/* 문장 선택 */}
+      {/* 문장 선택 탭 */}
       {results.length > 1 && (
-        <div className="flex gap-2 px-4 pt-3 pb-1 overflow-x-auto">
+        <div className="flex gap-2 px-4 pt-3 pb-2 overflow-x-auto shrink-0">
           {results.map((r, i) => (
             <button
               key={r.id}
@@ -378,48 +412,30 @@ export default function Result() {
         </div>
       )}
 
-      {/* 원문 */}
-      <div className="px-4 pt-2 pb-1">
-        <p className="text-xs text-gray-400 mb-0.5">원문</p>
-        <p className="text-sm font-medium text-gray-800 leading-relaxed">{cur?.sentence}</p>
-      </div>
-
-      {/* 블록 탭 */}
-      {cur?.blocks && <BlockTabs blocks={cur.blocks} active={tab} onChange={setTab} />}
-
-      {/* 블록 내용 (스크롤) */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 min-h-0">
-        {cur?.blocks && (
-          tab === 'G' ? (
-            <GQuiz
-              text={cur.blocks.G}
-              quizStatus={quizMap[cur.id]}
-              onResult={(status, correctAnswer, userInput) =>
-                handleQuizResult(cur, status, correctAnswer, userInput)
-              }
-            />
-          ) : (
-            <div className={`rounded-xl border-2 p-4 ${BLOCK_COLORS[tab] || 'bg-gray-50 border-gray-200'}`}>
-              <p className="text-xs font-bold text-gray-400 mb-1">{BLOCK_LABELS[tab]}</p>
-              <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
-                {cur.blocks[tab]}
-              </p>
-            </div>
-          )
+      {/* 스크롤 영역 — 모든 블록 펼쳐서 보여줌 */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 min-h-0 flex flex-col gap-4">
+        {cur && (
+          <SentenceCard
+            item={cur}
+            quizStatus={quizMap[cur.id]}
+            onQuizResult={(status, correctAnswer, userInput) =>
+              handleQuizResult(status, correctAnswer, userInput)
+            }
+          />
         )}
 
         {/* 텔레그램 전송 */}
         {allAttempted && !sent && (
-          <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
+          <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200">
             <p className="text-sm font-bold text-gray-700 mb-3">
-              🎯 최종 점수: {score}점 ({correctCount}/{results.length})
+              🎯 최종 점수: {score}점 ({correctCount}/{quizSentences.length})
             </p>
             <input
               type="text"
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder="이름 입력 (선택)"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-2 focus:outline-none focus:border-indigo-400"
+              className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm mb-2 focus:outline-none focus:border-indigo-400"
             />
             <button
               onClick={handleSend}
@@ -432,16 +448,18 @@ export default function Result() {
         )}
 
         {sent && (
-          <div className="mt-4 p-4 bg-green-50 rounded-xl border border-green-200 text-center">
+          <div className="p-4 bg-green-50 rounded-2xl border border-green-200 text-center">
             <p className="text-green-700 font-bold">✅ 텔레그램으로 전송됐습니다!</p>
             <button onClick={() => navigate('/')} className="mt-2 text-sm text-indigo-600 underline">
               홈으로 돌아가기
             </button>
           </div>
         )}
+
+        <div className="h-2" />
       </div>
 
-      {/* 채팅 패널 (Phase 2+4) */}
+      {/* 채팅 패널 */}
       <ChatPanel
         key={cur?.id}
         sentence={cur?.sentence}
@@ -451,7 +469,7 @@ export default function Result() {
 
       {/* 이전/다음 네비 */}
       {results.length > 1 && (
-        <div className="flex items-center justify-between px-4 py-2 border-t border-gray-100">
+        <div className="flex items-center justify-between px-4 py-2 border-t border-gray-100 shrink-0">
           <button
             onClick={() => handleSentenceChange(Math.max(0, sidx - 1))}
             disabled={sidx === 0}
