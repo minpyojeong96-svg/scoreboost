@@ -1,10 +1,10 @@
 import { useRef, useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-const BRIGHTNESS_MIN = 80
-const BRIGHTNESS_MAX = 220
-const TILT_MAX = 15
-const LAPLACIAN_MIN = 100
+const BRIGHTNESS_MIN = 60
+const BRIGHTNESS_MAX = 230
+const TILT_MAX = 20
+const LAPLACIAN_MIN = 30
 
 function computeBrightness(ctx, w, h) {
   const { data } = ctx.getImageData(0, 0, w, h)
@@ -46,8 +46,9 @@ export default function Camera() {
   const checkRef = useRef(null)
   const streamRef = useRef(null)
   const orientRef = useRef({ beta: 0, gamma: 0 })
+  const hasOrientRef = useRef(false) // deviceorientation 이벤트 수신 여부
 
-  const [status, setStatus] = useState({ brightness: false, angle: false, focus: false })
+  const [status, setStatus] = useState({ brightness: false, angle: true, focus: false })
   const [preview, setPreview] = useState(null)
   const [error, setError] = useState(null)
 
@@ -74,7 +75,8 @@ export default function Camera() {
     startCamera()
 
     const handleOrientation = (e) => {
-      orientRef.current = { beta: e.beta ?? 0, gamma: e.gamma ?? 0 }
+      hasOrientRef.current = true
+      orientRef.current = { beta: e.beta ?? 90, gamma: e.gamma ?? 0 }
     }
     window.addEventListener('deviceorientation', handleOrientation)
 
@@ -91,12 +93,18 @@ export default function Camera() {
 
       const brightness = computeBrightness(ctx, w, h)
       const variance = computeLaplacianVariance(ctx, w, h)
-      const { beta, gamma } = orientRef.current
-      const tilt = Math.max(Math.abs(beta - 90), Math.abs(gamma))
+
+      // 기기 방향 이벤트가 없으면(데스크탑 등) 각도 OK 처리
+      let angleOk = true
+      if (hasOrientRef.current) {
+        const { beta, gamma } = orientRef.current
+        const tilt = Math.max(Math.abs(beta - 90), Math.abs(gamma))
+        angleOk = tilt <= TILT_MAX
+      }
 
       setStatus({
         brightness: brightness >= BRIGHTNESS_MIN && brightness <= BRIGHTNESS_MAX,
-        angle: tilt <= TILT_MAX,
+        angle: angleOk,
         focus: variance >= LAPLACIAN_MIN
       })
     }, 500)
@@ -109,6 +117,7 @@ export default function Camera() {
 
   const capture = () => {
     const video = videoRef.current
+    if (!video || video.videoWidth === 0) return
     const canvas = document.createElement('canvas')
     canvas.width = video.videoWidth
     canvas.height = video.videoHeight
@@ -120,7 +129,7 @@ export default function Camera() {
 
   const retake = () => {
     setPreview(null)
-    setStatus({ brightness: false, angle: false, focus: false })
+    setStatus({ brightness: false, angle: true, focus: false })
     startCamera()
   }
 
@@ -132,7 +141,10 @@ export default function Camera() {
     return (
       <div className="flex flex-col items-center justify-center h-full px-6 gap-4">
         <p className="text-red-500 text-center">{error}</p>
-        <button onClick={startCamera} className="px-6 py-3 bg-indigo-600 text-white rounded-xl">
+        <button
+          onClick={() => { setError(null); startCamera() }}
+          className="px-6 py-3 bg-indigo-600 text-white rounded-xl"
+        >
           다시 시도
         </button>
       </div>
@@ -174,14 +186,11 @@ export default function Camera() {
         {/* 가이드 프레임 오버레이 */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="relative w-4/5 h-3/5">
-            {/* 어두운 마스크 */}
             <div className="absolute inset-0 border-0" style={{
               boxShadow: '0 0 0 9999px rgba(0,0,0,0.5)',
               borderRadius: '8px'
             }} />
-            {/* 가이드 테두리 */}
             <div className={`absolute inset-0 rounded-lg border-2 transition-colors ${allGood ? 'border-green-400' : 'border-white/60'}`} />
-            {/* 모서리 강조 */}
             {['top-0 left-0', 'top-0 right-0', 'bottom-0 left-0', 'bottom-0 right-0'].map((pos, i) => (
               <div key={i} className={`absolute w-6 h-6 ${pos} border-2 ${allGood ? 'border-green-400' : 'border-white'} rounded-sm`} />
             ))}
@@ -217,19 +226,21 @@ export default function Camera() {
         </div>
       </div>
 
-      {/* 촬영 버튼 */}
-      <div className="flex justify-center py-6 bg-black">
+      {/* 촬영 버튼 — 조건 미충족이어도 누를 수 있음 (경고 색상만 다름) */}
+      <div className="flex flex-col items-center py-6 bg-black gap-2">
         <button
           onClick={capture}
-          disabled={!allGood}
-          className={`w-20 h-20 rounded-full border-4 transition-all ${
+          className={`w-20 h-20 rounded-full border-4 transition-all active:scale-90 ${
             allGood
-              ? 'border-white bg-white/20 active:scale-90'
-              : 'border-gray-600 bg-gray-700 opacity-50'
+              ? 'border-white bg-white/20'
+              : 'border-yellow-400 bg-yellow-400/20'
           }`}
         >
           <span className="sr-only">촬영</span>
         </button>
+        {!allGood && (
+          <p className="text-yellow-400 text-xs">조건 미충족 — 그래도 촬영 가능</p>
+        )}
       </div>
 
       <canvas ref={canvasRef} className="hidden" />
