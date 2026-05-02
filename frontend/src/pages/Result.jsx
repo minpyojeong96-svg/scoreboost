@@ -136,26 +136,26 @@ function SentenceCard({ item, quizStatus, onQuizResult }) {
       )}
 
       {/* D: 문법 */}
-      {b.D && (
+      {b.D?.trim() && (
         <div className="bg-orange-50 rounded-2xl border-2 border-orange-200 p-4">
           <p className="text-xs font-bold text-orange-500 mb-2">📚 문법 설명</p>
-          <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{b.D}</p>
+          <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{b.D.trim()}</p>
         </div>
       )}
 
       {/* E: 이유 */}
-      {b.E && (
+      {b.E?.trim() && (
         <div className="bg-pink-50 rounded-2xl border-2 border-pink-200 p-4">
           <p className="text-xs font-bold text-pink-500 mb-2">💡 왜 이렇게 쓸까요?</p>
-          <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{b.E}</p>
+          <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{b.E.trim()}</p>
         </div>
       )}
 
       {/* F: 비교 */}
-      {b.F && (
+      {b.F?.trim() && (
         <div className="bg-red-50 rounded-2xl border-2 border-red-200 p-4">
           <p className="text-xs font-bold text-red-500 mb-2">⚠️ 이렇게 쓰면 틀려요!</p>
-          <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{b.F}</p>
+          <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{b.F.trim()}</p>
         </div>
       )}
 
