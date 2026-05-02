@@ -130,6 +130,7 @@ export default function Result() {
 
   const [phase, setPhase] = useState('loading')
   const [loadingMsg, setLoadingMsg] = useState('문장 분석 중...')
+  const [elapsed, setElapsed] = useState(0)
   const [errMsg, setErrMsg] = useState('')
   const [results, setResults] = useState([])
   const [sidx, setSidx] = useState(0)
@@ -141,6 +142,14 @@ export default function Result() {
   const [sent, setSent] = useState(false)
 
   const fromCurriculum = !state?.image && !!state?.sentences
+
+  // 로딩 중 경과 시간 타이머
+  useEffect(() => {
+    if (phase !== 'loading') { setElapsed(0); return }
+    setElapsed(0)
+    const t = setInterval(() => setElapsed(s => s + 1), 1000)
+    return () => clearInterval(t)
+  }, [phase])
 
   const runAnalysis = async () => {
     setPhase('loading')
@@ -290,10 +299,40 @@ export default function Result() {
   }
 
   if (phase === 'loading') {
+    const steps = [
+      { until: 5,  icon: '🔍', msg: 'GPT가 문장을 읽고 있어요...' },
+      { until: 12, icon: '✍️', msg: '문법을 분석하고 해석을 만드는 중이에요' },
+      { until: 20, icon: '📝', msg: '퀴즈와 설명을 정리하고 있어요' },
+      { until: 30, icon: '⏳', msg: '거의 다 됐어요! 조금만 기다려 주세요' },
+      { until: Infinity, icon: '🐢', msg: '시간이 좀 걸리네요... 서버가 열심히 일하는 중이에요' },
+    ]
+    const step = steps.find(s => elapsed < s.until)
+
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 px-6">
-        <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-        <p className="text-gray-500 text-sm text-center whitespace-pre-wrap">{loadingMsg}</p>
+      <div className="flex flex-col items-center justify-center h-full gap-5 px-6">
+        {/* 스피너 */}
+        <div className="relative">
+          <div className="w-16 h-16 border-4 border-indigo-100 rounded-full" />
+          <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin absolute inset-0" />
+          <span className="absolute inset-0 flex items-center justify-center text-2xl">{step.icon}</span>
+        </div>
+
+        {/* 경과 시간 */}
+        <div className="text-center">
+          <p className="text-indigo-600 font-bold text-lg">{elapsed}초</p>
+          <p className="text-gray-500 text-sm mt-1">{step.msg}</p>
+          {loadingMsg !== '문장 분석 중...' && (
+            <p className="text-orange-500 text-xs mt-2 whitespace-pre-wrap">{loadingMsg}</p>
+          )}
+        </div>
+
+        {/* 진행 힌트 */}
+        <div className="bg-indigo-50 rounded-xl px-4 py-3 text-center max-w-xs">
+          <p className="text-xs text-indigo-600">
+            💡 처음 분석은 <strong>20~30초</strong> 걸려요<br />
+            같은 문장은 다음부터 <strong>바로</strong> 나와요
+          </p>
+        </div>
       </div>
     )
   }
