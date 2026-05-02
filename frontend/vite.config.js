@@ -8,7 +8,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icons/*.png'],
-      manifest: false, // public/manifest.json 사용
+      manifest: false,
+      strategies: 'generateSW',
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
         runtimeCaching: [
@@ -18,10 +19,7 @@ export default defineConfig({
             options: { cacheName: 'google-fonts' }
           }
         ]
-      },
-      srcDir: 'public',
-      filename: 'sw.js',
-      strategies: 'injectManifest'
+      }
     })
   ]
 })
