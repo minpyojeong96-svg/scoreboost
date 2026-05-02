@@ -40,77 +40,158 @@ function parseG(text = '') {
 
 const normalize = (s) => s.toLowerCase().trim().replace(/[.,!?;:]+$/, '')
 
-// ─── G블록 퀴즈 ───────────────────────────────────────────────────────────────
-function GQuiz({ text, quizStatus, onResult }) {
+// ─── 정답 교정 TTS (천천히 → 정상) ──────────────────────────────────────────
+function speakCorrection(word) {
+  window.speechSynthesis.cancel()
+  const slow = new SpeechSynthesisUtterance(word)
+  slow.lang = 'en-US'; slow.rate = 0.5
+  const normal = new SpeechSynthesisUtterance(word)
+  normal.lang = 'en-US'; normal.rate = 1.0
+  slow.onend = () => setTimeout(() => window.speechSynthesis.speak(normal), 700)
+  window.speechSynthesis.speak(slow)
+}
+
+// ─── 음성 인식 퀴즈 ───────────────────────────────────────────────────────────
+function VoiceQuiz({ text, quizStatus, onResult }) {
   const { question, answer } = parseG(text)
-  const [input, setInput] = useState('')
+  const hasSR = !!(window.SpeechRecognition || window.webkitSpeechRecognition)
+  const [mode, setMode] = useState(hasSR ? 'voice' : 'text')
+  const [listening, setListening] = useState(false)
+  const [voiceAttempts, setVoiceAttempts] = useState(0)
+  const [textAttempts, setTextAttempts] = useState(0)
+  const [lastHeard, setLastHeard] = useState('')
+  const [textInput, setTextInput] = useState('')
+  const [wrongFeedback, setWrongFeedback] = useState(false)
+  const recRef = useRef(null)
+  const MAX_VOICE = 5
 
-  const submit = () => {
-    if (!input.trim()) return
-    const correct = answer && normalize(input) === normalize(answer)
-    onResult(correct ? 'correct' : 'wrong', answer, input)
+  const handleAnswer = (heard, isVoice) => {
+    if (normalize(heard) === normalize(answer)) {
+      setWrongFeedback(false)
+      onResult('correct', answer, heard)
+    } else {
+      setWrongFeedback(true)
+      setLastHeard(heard)
+      speakCorrection(answer)
+      if (isVoice) {
+        const next = voiceAttempts + 1
+        setVoiceAttempts(next)
+        if (next >= MAX_VOICE) setTimeout(() => setMode('text'), 1800)
+      } else {
+        setTextAttempts(t => t + 1)
+        setTextInput('')
+      }
+    }
   }
 
-  const reveal = () => onResult('revealed', answer, '')
-
-  if (quizStatus === 'correct') {
-    return (
-      <div className="rounded-2xl border-2 border-green-300 bg-green-50 p-4">
-        <p className="text-xs font-bold text-green-600 mb-2">✏️ 퀴즈</p>
-        <p className="text-sm text-gray-700 mb-3">{question}</p>
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">✅</span>
-          <span className="font-bold text-green-700">정답! <span className="font-mono">{answer}</span></span>
-        </div>
-      </div>
-    )
+  const startListening = () => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SR) { setMode('text'); return }
+    setWrongFeedback(false)
+    const r = new SR()
+    r.lang = 'en-US'; r.continuous = false; r.interimResults = false
+    recRef.current = r
+    r.onstart = () => setListening(true)
+    r.onend   = () => setListening(false)
+    r.onerror = () => setListening(false)
+    r.onresult = e => handleAnswer(e.results[0][0].transcript.trim(), true)
+    r.start()
   }
 
-  if (quizStatus === 'wrong' || quizStatus === 'revealed') {
-    return (
-      <div className="rounded-2xl border-2 border-red-200 bg-red-50 p-4">
-        <p className="text-xs font-bold text-red-500 mb-2">✏️ 퀴즈</p>
-        <p className="text-sm text-gray-700 mb-3">{question}</p>
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">{quizStatus === 'wrong' ? '❌' : '👀'}</span>
-          <span className="text-red-700 font-medium">
-            정답: <span className="font-bold font-mono">{answer}</span>
-          </span>
-        </div>
-        <p className="text-xs text-indigo-500 mt-2">💬 아래 선생님 채팅에서 이유를 물어보세요!</p>
-      </div>
-    )
+  const stopListening = () => { recRef.current?.stop(); setListening(false) }
+
+  const submitText = () => {
+    if (!textInput.trim()) return
+    handleAnswer(textInput.trim(), false)
   }
+
+  const reveal = () => {
+    speakCorrection(answer)
+    onResult('revealed', answer, '')
+  }
+
+  if (quizStatus === 'correct') return (
+    <div className="rounded-2xl border-2 border-green-300 bg-green-50 p-4 text-center">
+      <p className="text-3xl mb-1">✅</p>
+      <p className="font-bold text-green-700 text-lg font-mono">{answer}</p>
+      <p className="text-xs text-green-600 mt-1">정답! 다음 문장으로 이동하세요</p>
+    </div>
+  )
+
+  if (quizStatus === 'revealed') return (
+    <div className="rounded-2xl border-2 border-orange-200 bg-orange-50 p-4 text-center">
+      <p className="text-3xl mb-1">📖</p>
+      <p className="font-bold text-orange-700 text-lg font-mono">{answer}</p>
+      <p className="text-xs text-orange-600 mt-1">오답노트에 저장됐어요. 다음에 다시 도전!</p>
+    </div>
+  )
 
   return (
     <div className="rounded-2xl border-2 border-indigo-200 bg-indigo-50 p-4">
       <p className="text-xs font-bold text-indigo-500 mb-2">✏️ 퀴즈 — 빈칸을 채워보세요!</p>
-      <p className="text-sm text-gray-700 mb-3 whitespace-pre-wrap">{question}</p>
-      {answer ? (
+      <p className="text-sm text-gray-700 mb-4 whitespace-pre-wrap">{question}</p>
+
+      {wrongFeedback && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 mb-3 text-xs text-red-600">
+          ❌ 틀렸어요! 정답 발음을 들어보세요 🔊
+          {lastHeard && <span className="block text-gray-400 mt-0.5">들린 말: "{lastHeard}"</span>}
+        </div>
+      )}
+
+      {mode === 'voice' ? (
+        <div className="flex flex-col items-center gap-3">
+          <button
+            onClick={listening ? stopListening : startListening}
+            className={`w-24 h-24 rounded-full flex flex-col items-center justify-center gap-1 text-white shadow-lg transition-all
+              ${listening ? 'bg-red-500 animate-pulse scale-105' : 'bg-indigo-600 active:scale-95'}`}
+          >
+            <span className="text-3xl">{listening ? '🔴' : '🎤'}</span>
+            <span className="text-xs font-bold">{listening ? '듣는 중...' : '눌러서 말하기'}</span>
+          </button>
+
+          {voiceAttempts > 0 && voiceAttempts < MAX_VOICE && (
+            <p className="text-xs text-orange-500 text-center">
+              음성 시도 {voiceAttempts}/{MAX_VOICE} — {MAX_VOICE - voiceAttempts}번 남음
+            </p>
+          )}
+
+          <div className="flex gap-4 text-xs text-gray-400">
+            <button onClick={() => setMode('text')} className="underline">텍스트로 입력</button>
+            <button onClick={reveal} className="underline">정답 보기</button>
+          </div>
+        </div>
+      ) : (
         <div className="flex flex-col gap-2">
+          {voiceAttempts >= MAX_VOICE && (
+            <p className="text-xs text-orange-500 mb-1">음성 인식 5회 초과 → 직접 입력해주세요</p>
+          )}
           <div className="flex gap-2">
             <input
               type="text"
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && submit()}
+              value={textInput}
+              onChange={e => setTextInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && submitText()}
               placeholder="정답을 입력하세요"
               className="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400 bg-white"
+              autoFocus
             />
             <button
-              onClick={submit}
-              disabled={!input.trim()}
+              onClick={submitText}
+              disabled={!textInput.trim()}
               className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold disabled:opacity-40"
             >
               확인
             </button>
           </div>
-          <button onClick={reveal} className="text-xs text-gray-400 underline self-start">
-            정답 보기
-          </button>
+          <div className="flex gap-4 text-xs text-gray-400">
+            {hasSR && (
+              <button onClick={() => { setMode('voice'); setWrongFeedback(false) }} className="underline">
+                음성으로 다시 시도
+              </button>
+            )}
+            <button onClick={reveal} className="underline">정답 보기</button>
+          </div>
         </div>
-      ) : (
-        <p className="text-sm text-gray-600 whitespace-pre-wrap">{text}</p>
       )}
     </div>
   )
@@ -199,7 +280,7 @@ function SentenceCard({ item, quizStatus, onQuizResult }) {
 
       {/* G: 퀴즈 */}
       {b.G && (
-        <GQuiz
+        <VoiceQuiz
           text={b.G}
           quizStatus={quizStatus}
           onResult={onQuizResult}
@@ -508,22 +589,29 @@ export default function Result() {
 
       {/* 이전/다음 네비 */}
       {results.length > 1 && (
-        <div className="flex items-center justify-between px-4 py-2 border-t border-gray-100 shrink-0">
-          <button
-            onClick={() => handleSentenceChange(Math.max(0, sidx - 1))}
-            disabled={sidx === 0}
-            className="px-4 py-2 text-sm text-gray-500 disabled:opacity-30"
-          >
-            ← 이전
-          </button>
-          <span className="text-xs text-gray-400">{sidx + 1} / {results.length}</span>
-          <button
-            onClick={() => handleSentenceChange(Math.min(results.length - 1, sidx + 1))}
-            disabled={sidx === results.length - 1}
-            className="px-4 py-2 text-sm text-indigo-600 font-medium disabled:opacity-30"
-          >
-            다음 →
-          </button>
+        <div className="flex flex-col shrink-0 border-t border-gray-100">
+          {cur?.blocks?.G && !quizMap[cur.id] && (
+            <p className="text-center text-xs text-orange-500 pt-2 pb-0.5">
+              🔒 퀴즈를 풀어야 다음으로 이동할 수 있어요
+            </p>
+          )}
+          <div className="flex items-center justify-between px-4 py-2">
+            <button
+              onClick={() => handleSentenceChange(Math.max(0, sidx - 1))}
+              disabled={sidx === 0}
+              className="px-4 py-2 text-sm text-gray-500 disabled:opacity-30"
+            >
+              ← 이전
+            </button>
+            <span className="text-xs text-gray-400">{sidx + 1} / {results.length}</span>
+            <button
+              onClick={() => handleSentenceChange(Math.min(results.length - 1, sidx + 1))}
+              disabled={sidx === results.length - 1 || !!(cur?.blocks?.G && !quizMap[cur.id])}
+              className="px-4 py-2 text-sm text-indigo-600 font-medium disabled:opacity-30"
+            >
+              다음 →
+            </button>
+          </div>
         </div>
       )}
     </div>
