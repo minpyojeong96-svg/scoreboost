@@ -39,7 +39,16 @@ function parseG(text = '') {
 }
 
 const normalize = (s) => (s == null ? '' : String(s)).toLowerCase().trim().replace(/[.,!?;:]+$/, '')
-const safeStr = (v) => typeof v === 'string' ? v.trim() : ''
+
+// GPT가 string 대신 object/array를 반환해도 안전하게 문자열로 변환
+const blockStr = (v) => {
+  if (v == null) return ''
+  if (typeof v === 'string') return v.trim()
+  if (Array.isArray(v)) return v.map(x => typeof x === 'object' ? JSON.stringify(x) : String(x)).join('\n')
+  if (typeof v === 'object') return Object.entries(v).map(([k, val]) => `${k}: ${val}`).join('\n')
+  return String(v)
+}
+const safeStr = blockStr
 
 // ─── 정답 교정 TTS (천천히 → 정상) ──────────────────────────────────────────
 function speakCorrection(word) {
@@ -234,26 +243,26 @@ function SentenceCard({ item, quizStatus, onQuizResult }) {
       </div>
 
       {/* A: 해석 */}
-      {b.A && (
+      {blockStr(b.A) && (
         <div className="bg-blue-50 rounded-2xl border-2 border-blue-200 p-4">
           <p className="text-xs font-bold text-blue-500 mb-2">🗣️ 우리말 해석</p>
-          <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{b.A}</p>
+          <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{blockStr(b.A)}</p>
         </div>
       )}
 
       {/* B: 단어 */}
-      {b.B && (
+      {blockStr(b.B) && (
         <div className="bg-purple-50 rounded-2xl border-2 border-purple-200 p-4">
           <p className="text-xs font-bold text-purple-500 mb-2">📖 단어 하나씩 뜯어보기</p>
-          <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{b.B}</p>
+          <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{blockStr(b.B)}</p>
         </div>
       )}
 
       {/* C: 구조 */}
-      {b.C && (
+      {blockStr(b.C) && (
         <div className="bg-green-50 rounded-2xl border-2 border-green-200 p-4">
           <p className="text-xs font-bold text-green-600 mb-2">🔍 문장 구조 (주어/동사/목적어)</p>
-          <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{b.C}</p>
+          <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{blockStr(b.C)}</p>
         </div>
       )}
 
