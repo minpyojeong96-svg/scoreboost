@@ -38,7 +38,8 @@ function parseG(text = '') {
   }
 }
 
-const normalize = (s) => s.toLowerCase().trim().replace(/[.,!?;:]+$/, '')
+const normalize = (s) => (s == null ? '' : String(s)).toLowerCase().trim().replace(/[.,!?;:]+$/, '')
+const safeStr = (v) => typeof v === 'string' ? v.trim() : ''
 
 // ─── 정답 교정 TTS (천천히 → 정상) ──────────────────────────────────────────
 function speakCorrection(word) {
@@ -257,26 +258,26 @@ function SentenceCard({ item, quizStatus, onQuizResult }) {
       )}
 
       {/* D: 문법 */}
-      {b.D?.trim() && (
+      {safeStr(b.D) && (
         <div className="bg-orange-50 rounded-2xl border-2 border-orange-200 p-4">
           <p className="text-xs font-bold text-orange-500 mb-2">📚 문법 설명</p>
-          <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{b.D.trim()}</p>
+          <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{safeStr(b.D)}</p>
         </div>
       )}
 
       {/* E: 이유 */}
-      {b.E?.trim() && (
+      {safeStr(b.E) && (
         <div className="bg-pink-50 rounded-2xl border-2 border-pink-200 p-4">
           <p className="text-xs font-bold text-pink-500 mb-2">💡 왜 이렇게 쓸까요?</p>
-          <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{b.E.trim()}</p>
+          <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{safeStr(b.E)}</p>
         </div>
       )}
 
       {/* F: 비교 */}
-      {b.F?.trim() && (
+      {safeStr(b.F) && (
         <div className="bg-red-50 rounded-2xl border-2 border-red-200 p-4">
           <p className="text-xs font-bold text-red-500 mb-2">⚠️ 이렇게 쓰면 틀려요!</p>
-          <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{b.F.trim()}</p>
+          <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{safeStr(b.F)}</p>
         </div>
       )}
 
