@@ -35,6 +35,25 @@ app.use(rateLimit)
 
 app.get('/ping', (_req, res) => res.json({ ok: true, ts: Date.now() }))
 
+app.get('/api/health', async (_req, res) => {
+  const key = process.env.OPENAI_API_KEY || ''
+  let openai = 'key_missing'
+  if (key) {
+    try {
+      const r = await fetch('https://api.openai.com/v1/models', {
+        headers: { Authorization: `Bearer ${key}` }
+      })
+      openai = r.ok ? 'ok' : `error_${r.status}`
+    } catch { openai = 'network_error' }
+  }
+  res.json({
+    openai,
+    key_hint: key ? `${key.slice(0, 12)}...${key.slice(-4)}` : '(없음)',
+    supabase_url: process.env.SUPABASE_URL ? '설정됨' : '없음',
+    frontend_url: process.env.FRONTEND_URL || '없음'
+  })
+})
+
 app.use('/api/ocr', requireAuth, ocrRouter)
 app.use('/api/analyze', requireAuth, analyzeRouter)
 app.use('/api/problem', problemRouter)
