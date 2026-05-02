@@ -12,7 +12,9 @@ async function post(path, body) {
     headers,
     body: JSON.stringify(body)
   })
-  const data = await res.json()
+  const text = await res.text()
+  let data
+  try { data = JSON.parse(text) } catch { data = { error: `서버 오류 ${res.status}` } }
   if (!res.ok) throw Object.assign(new Error(data.error || `오류 ${res.status}`), { retake: data.retake })
   return data
 }

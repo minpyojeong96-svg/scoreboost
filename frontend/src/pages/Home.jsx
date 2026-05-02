@@ -29,6 +29,7 @@ export default function Home() {
   }, [user])
 
   const loadAll = async () => {
+    try {
     const [{ data: profile }, { data: notes }] = await Promise.all([
       supabase.from('users').select('school_level').eq('id', user.id).maybeSingle(),
       supabase.from('wrong_notes')
@@ -58,6 +59,7 @@ export default function Home() {
     ).size
 
     setStats({ total: notes.length, todayCount, weakTags, recentDays })
+    } catch { setStats({ total: 0, todayCount: 0, weakTags: [], recentDays: 0 }) }
   }
 
   const name = user?.user_metadata?.full_name?.split(' ')[0] || '학습자'
