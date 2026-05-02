@@ -155,11 +155,16 @@ export default function Result() {
         sentences = ocr.sentences
       }
 
+      // 커리큘럼 경로는 최대 10문장 (비용·속도 제한)
+      const toAnalyze = fromCurriculum && sentences.length > 10
+        ? [...sentences].sort(() => Math.random() - 0.5).slice(0, 10)
+        : sentences
+
       const MAX_RETRIES = 3
       let lastErr
       for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
         try {
-          const { results: res } = await analyzeSentences(sentences)
+          const { results: res } = await analyzeSentences(toAnalyze)
           if (!Array.isArray(res) || res.length === 0) throw new Error('서버에서 분석 결과를 받지 못했습니다')
           setResults(res)
           if (res[0]?.blocks) setTab(Object.keys(res[0].blocks)[0] || 'A')
