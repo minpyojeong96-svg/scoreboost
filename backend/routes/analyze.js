@@ -106,10 +106,30 @@ async function callGPT(sentence, hasPattern) {
 
 // ── 메인 분석 함수 ────────────────────────────────────────────────────────────
 async function analyzeSentence(sentence) {
-  // 1. 임베딩 생성
-  const embedding = await getEmbedding(sentence)
+  const trimmed = sentence.trim()
 
-  // 2. 캐시 히트 확인 (90%+ 유사도 = 재사용)
+  // 0. 정확한 텍스트 매칭 (임베딩 API 호출 없이 즉시 반환)
+  const { data: exact } = await supabase
+    .from('sentences')
+    .select('id, sentence, translation, grammar_tags, blocks')
+    .eq('sentence', trimmed)
+    .maybeSingle()
+  if (exact) {
+    return {
+      id: exact.id,
+      sentence: exact.sentence,
+      translation: exact.translation,
+      grammar_tags: exact.grammar_tags,
+      blocks: exact.blocks,
+      source: 'exact_hit',
+      cached: true
+    }
+  }
+
+  // 1. 임베딩 생성
+  const embedding = await getEmbedding(trimmed)
+
+  // 2. 벡터 유사도 캐시 히트 확인 (90%+ = 재사용)
   const cached = await findCachedSentence(embedding)
   if (cached) {
     return {
@@ -128,7 +148,7 @@ async function analyzeSentence(sentence) {
   const hasPattern = !!pattern
 
   // 4. GPT 호출 (패턴 있으면 A/B/C/G만, 없으면 전체)
-  const result = await callGPT(sentence, hasPattern)
+  const result = await callGPT(trimmed, hasPattern)
 
   // 5. D/E/F 블록 병합 (패턴 있으면 패턴 것 사용)
   const blocks = { ...result.blocks }
@@ -139,13 +159,13 @@ async function analyzeSentence(sentence) {
   }
 
   // 6. AI 자동 검수 (생성 직후 GPT-4o가 다시 확인)
-  const review = await autoReview(sentence.trim(), result.translation, blocks)
+  const review = await autoReview(trimmed, result.translation, blocks)
 
   // 7. DB 저장
   const { data: saved, error } = await supabase
     .from('sentences')
     .insert({
-      sentence: sentence.trim(),
+      sentence: trimmed,
       translation: result.translation,
       grammar_tags: result.grammar_tags || [],
       embedding,
@@ -163,7 +183,7 @@ async function analyzeSentence(sentence) {
 
   return {
     id: saved.id,
-    sentence: sentence.trim(),
+    sentence: trimmed,
     translation: result.translation,
     grammar_tags: result.grammar_tags || [],
     blocks,
