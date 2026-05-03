@@ -3,3 +3,12 @@ node_modules/
 .env.local
 dist/
 .DS_Store
+
+batch_*.txt
+batches.json
+get_todo.py
+pregen.py
+run_all.py
+run_all_log.txt
+save_sentences.py
+todo_sentences.json
