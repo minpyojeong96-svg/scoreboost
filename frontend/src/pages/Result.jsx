@@ -387,9 +387,7 @@ export default function Result() {
         sentences = ocr.sentences
       }
 
-      const toAnalyze = fromCurriculum && sentences.length > 10
-        ? [...sentences].sort(() => Math.random() - 0.5).slice(0, 10)
-        : sentences
+      const toAnalyze = sentences
 
       const MAX_RETRIES = 3
       let lastErr
