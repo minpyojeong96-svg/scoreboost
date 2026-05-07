@@ -48,7 +48,8 @@ router.post('/send', async (req, res, next) => {
       recommended_tags = []
     } = req.body
 
-    if (!chat_id) return res.status(400).json({ error: 'chat_id가 필요합니다' })
+    const target_id = chat_id || process.env.TELEGRAM_CHAT_ID
+    if (!target_id) return res.status(400).json({ error: 'chat_id가 필요합니다' })
 
     const today = formatDate(new Date().toISOString())
 
@@ -87,7 +88,7 @@ router.post('/send', async (req, res, next) => {
       `📌 추천 복습: <b>${tagList}</b>`
     ].join('\n')
 
-    await sendMessage(chat_id, text)
+    await sendMessage(target_id, text)
     res.json({ ok: true })
   } catch (err) {
     next(err)

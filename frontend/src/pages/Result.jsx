@@ -467,18 +467,6 @@ export default function Result() {
   const handleSend = async () => {
     setSending(true)
     try {
-      const { data: profile } = await supabase
-        .from('users')
-        .select('telegram_id')
-        .eq('id', user.id)
-        .maybeSingle()
-
-      if (!profile?.telegram_id) {
-        alert('텔레그램 Chat ID가 설정되지 않았어요.\n프로필에서 설정하면 결과를 전송할 수 있어요!')
-        navigate('/profile')
-        return
-      }
-
       const minutes = Math.round((Date.now() - startTime.current) / 60000)
       const wrongItems = results
         .filter(r => quizMap[r.id] === 'wrong' || quizMap[r.id] === 'revealed')
@@ -498,7 +486,7 @@ export default function Result() {
       const studiedSentences = results.slice(0, 5).map(r => r.sentence)
 
       await sendToTelegram({
-        chat_id: profile.telegram_id,
+        chat_id: null,
         name: name || user?.user_metadata?.full_name || '학습자',
         study_minutes: minutes,
         score,
