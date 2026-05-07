@@ -40,6 +40,10 @@ router.post('/send', async (req, res, next) => {
       name,
       study_minutes = 0,
       score = 0,
+      total_problems = 0,
+      correct_count = 0,
+      studied_tags = [],
+      studied_sentences = [],
       wrong_items = [],
       recommended_tags = []
     } = req.body
@@ -56,13 +60,26 @@ router.post('/send', async (req, res, next) => {
       ? recommended_tags.join(', ')
       : '없음'
 
+    const studiedTagLine = studied_tags.length > 0
+      ? studied_tags.join(', ')
+      : '없음'
+
+    const sentenceLines = studied_sentences.length > 0
+      ? studied_sentences.map(s => `• ${s}`).join('\n')
+      : ''
+
     const text = [
       '📊 <b>오늘 학습 결과</b>',
       '━━━━━━━━━━━━━━',
       `👤 ${name}`,
       `📅 ${today}`,
       `⏱ 학습시간: ${study_minutes}분`,
+      `📝 풀이: ${total_problems}문제 중 ${correct_count}개 정답`,
       `✅ 점수: ${score}점`,
+      '',
+      '📚 <b>오늘 학습한 문법</b>',
+      `• ${studiedTagLine}`,
+      ...(sentenceLines ? ['', '📖 <b>학습한 문장</b>', sentenceLines] : []),
       '',
       '❌ <b>오답 목록</b>',
       wrongList,

@@ -453,11 +453,23 @@ export default function Result() {
       const recommendedTags = Object.entries(tagCount)
         .sort((a, b) => b[1] - a[1]).slice(0, 3).map(([tag]) => tag)
 
+      // 오늘 학습한 문법 태그 (전체 문장에서 중복 제거)
+      const studiedTags = [...new Set(
+        results.flatMap(r => r.grammar_tags || [])
+      )].slice(0, 5)
+
+      // 학습한 문장 목록 (최대 5개)
+      const studiedSentences = results.slice(0, 5).map(r => r.sentence)
+
       await sendToTelegram({
         chat_id: profile.telegram_id,
         name: name || user?.user_metadata?.full_name || '학습자',
         study_minutes: minutes,
         score,
+        total_problems: quizSentences.length,
+        correct_count: correctCount,
+        studied_tags: studiedTags,
+        studied_sentences: studiedSentences,
         wrong_items: wrongItems,
         recommended_tags: recommendedTags
       })
