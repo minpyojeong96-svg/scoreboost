@@ -30,9 +30,24 @@ function useTTS() {
 }
 
 function parseG(text = '') {
+  const lines = text.trim().split('\n')
+  // 2줄 형식: 첫째 줄 한국어 힌트, 둘째 줄 영어 문제 (정답)
+  if (lines.length >= 2) {
+    const enLine = lines.slice(1).join(' ').trim()
+    const m = enLine.match(/\(([^)]+)\)\s*$/)
+    if (m) {
+      return {
+        hint_ko: lines[0].trim(),
+        question: enLine.slice(0, enLine.lastIndexOf(`(${m[1]}`)).trim(),
+        answer: m[1]
+      }
+    }
+  }
+  // 구형 단일 줄 형식 fallback
   const m = text.match(/\(([^)]+)\)\s*$/)
-  if (!m) return { question: text, answer: null }
+  if (!m) return { hint_ko: null, question: text, answer: null }
   return {
+    hint_ko: null,
     question: text.slice(0, text.lastIndexOf(`(${m[1]}`)).trim(),
     answer: m[1]
   }
@@ -64,7 +79,7 @@ function speakCorrection(word) {
 
 // ─── 음성 인식 퀴즈 ───────────────────────────────────────────────────────────
 function VoiceQuiz({ text, quizStatus, onResult }) {
-  const { question, answer } = parseG(text)
+  const { hint_ko, question, answer } = parseG(text)
   const hasSR = !!(window.SpeechRecognition || window.webkitSpeechRecognition)
   const [mode, setMode] = useState(hasSR ? 'voice' : 'text')
   const [listening, setListening] = useState(false)
@@ -141,6 +156,12 @@ function VoiceQuiz({ text, quizStatus, onResult }) {
   return (
     <div className="rounded-2xl border-2 border-indigo-200 bg-indigo-50 p-4">
       <p className="text-xs font-bold text-indigo-500 mb-2">✏️ 퀴즈 — 빈칸을 채워보세요!</p>
+      {hint_ko && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 mb-3">
+          <p className="text-xs text-blue-500 font-bold mb-0.5">한국어 힌트</p>
+          <p className="text-sm text-blue-800">{hint_ko}</p>
+        </div>
+      )}
       <p className="text-sm text-gray-700 mb-4 whitespace-pre-wrap">{question}</p>
 
       {wrongFeedback && (

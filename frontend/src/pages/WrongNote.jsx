@@ -14,9 +14,21 @@ const BLOCK_COLORS = {
 }
 
 function parseG(text = '') {
+  const lines = text.trim().split('\n')
+  if (lines.length >= 2) {
+    const enLine = lines.slice(1).join(' ').trim()
+    const m = enLine.match(/\(([^)]+)\)\s*$/)
+    if (m) {
+      return {
+        hint_ko: lines[0].trim(),
+        question: enLine.slice(0, enLine.lastIndexOf(`(${m[1]}`)).trim(),
+        answer: m[1]
+      }
+    }
+  }
   const m = text.match(/\(([^)]+)\)\s*$/)
-  if (!m) return { question: text, answer: null }
-  return { question: text.slice(0, text.lastIndexOf(`(${m[1]}`)).trim(), answer: m[1] }
+  if (!m) return { hint_ko: null, question: text, answer: null }
+  return { hint_ko: null, question: text.slice(0, text.lastIndexOf(`(${m[1]}`)).trim(), answer: m[1] }
 }
 
 const normalize = (s) => s.toLowerCase().trim().replace(/[.,!?;:]+$/, '')
