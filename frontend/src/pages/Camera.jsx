@@ -117,12 +117,20 @@ export default function Camera() {
 
   const capture = () => {
     const video = videoRef.current
-    if (!video || video.videoWidth === 0) return
+    if (!video || video.videoWidth === 0 || video.readyState < 2) {
+      setError('카메라가 아직 준비 중입니다. 잠시 후 다시 시도해주세요.')
+      return
+    }
+    // OCR 정확도를 유지하면서 파일 크기 축소 (최대 1024px)
+    const MAX_W = 1024
+    const scale = Math.min(1, MAX_W / video.videoWidth)
+    const w = Math.floor(video.videoWidth * scale)
+    const h = Math.floor(video.videoHeight * scale)
     const canvas = document.createElement('canvas')
-    canvas.width = video.videoWidth
-    canvas.height = video.videoHeight
-    canvas.getContext('2d').drawImage(video, 0, 0)
-    const base64 = canvas.toDataURL('image/jpeg', 0.9)
+    canvas.width = w
+    canvas.height = h
+    canvas.getContext('2d').drawImage(video, 0, 0, w, h)
+    const base64 = canvas.toDataURL('image/jpeg', 0.75)
     stopCamera()
     setPreview(base64)
   }

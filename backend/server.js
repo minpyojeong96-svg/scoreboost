@@ -59,7 +59,7 @@ app.use('/api/ocr', requireAuth, ocrRouter)
 app.use('/api/analyze', requireAuth, analyzeRouter)
 app.use('/api/problem', problemRouter)
 app.use('/api/telegram', telegramRouter)
-app.use('/api/chat', requireAuth, chatRouter)
+app.use('/api/chat', chatRouter)
 app.use('/api/review', reviewRouter)
 app.use('/api/admin', requireAuth, adminRouter)
 

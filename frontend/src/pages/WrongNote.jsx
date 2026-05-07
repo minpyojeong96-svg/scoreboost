@@ -88,6 +88,11 @@ function RetryModal({ note, onClose, onCorrect }) {
   const nextCount = (note.review_count || 0) + 1
   const nextDays = REVIEW_INTERVALS[Math.min(nextCount, REVIEW_INTERVALS.length - 1)]
 
+  // 힌트: 첫 글자 + 나머지 언더스코어
+  const hint = answer
+    ? answer[0] + '_'.repeat(Math.max(0, answer.length - 1)) + ` (${answer.length}글자)`
+    : null
+
   const submit = () => {
     if (!input.trim() || !answer) return
     const isCorrect = normalize(input) === normalize(answer)
@@ -113,7 +118,20 @@ function RetryModal({ note, onClose, onCorrect }) {
           <button onClick={onClose} className="text-gray-400 text-xl p-1">✕</button>
         </div>
 
+        {note.translation && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-2">
+            <p className="text-xs text-blue-500 font-bold mb-0.5">한글 해석</p>
+            <p className="text-sm text-blue-800">{note.translation}</p>
+          </div>
+        )}
+
         <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{question}</p>
+
+        {hint && !status && (
+          <p className="text-xs text-gray-400">
+            힌트: <span className="font-mono text-indigo-500">{hint}</span>
+          </p>
+        )}
 
         {!status && answer && (
           <div className="flex gap-2">
