@@ -474,7 +474,7 @@ export default function Result() {
         .maybeSingle()
 
       if (!profile?.telegram_id) {
-        alert('프로필에서 텔레그램 Chat ID를 먼저 설정해주세요')
+        alert('텔레그램 Chat ID가 설정되지 않았어요.\n프로필에서 설정하면 결과를 전송할 수 있어요!')
         navigate('/profile')
         return
       }
@@ -604,26 +604,38 @@ export default function Result() {
           />
         )}
 
-        {/* 텔레그램 전송 */}
+        {/* 점수 + 텔레그램 전송 */}
         {allAttempted && !sent && (
-          <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200">
-            <p className="text-sm font-bold text-gray-700 mb-3">
-              🎯 최종 점수: {score}점 ({correctCount}/{quizSentences.length})
-            </p>
-            <input
-              type="text"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              placeholder="이름 입력 (선택)"
-              className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm mb-2 focus:outline-none focus:border-indigo-400"
-            />
-            <button
-              onClick={handleSend}
-              disabled={sending}
-              className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold disabled:opacity-60"
-            >
-              {sending ? '전송 중...' : '📲 텔레그램으로 전송'}
-            </button>
+          <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 flex flex-col gap-3">
+            <div className="text-center">
+              <p className="text-2xl font-bold text-indigo-600">{score}점</p>
+              <p className="text-sm text-gray-500">{correctCount}개 정답 / {quizSentences.length}문제</p>
+            </div>
+            {user ? (
+              <>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  placeholder="이름 입력 (선택)"
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
+                />
+                <button
+                  onClick={handleSend}
+                  disabled={sending}
+                  className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold disabled:opacity-60"
+                >
+                  {sending ? '전송 중...' : '📲 텔레그램으로 전송'}
+                </button>
+                <p className="text-xs text-center text-gray-400">
+                  텔레그램 ID 미설정 시 프로필에서 먼저 입력해주세요
+                </p>
+              </>
+            ) : (
+              <p className="text-xs text-center text-gray-400">
+                로그인하면 텔레그램으로 결과를 전송할 수 있어요
+              </p>
+            )}
           </div>
         )}
 
