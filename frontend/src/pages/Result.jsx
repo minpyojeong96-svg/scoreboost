@@ -36,10 +36,15 @@ function parseG(text = '') {
     const enLine = lines.slice(1).join(' ').trim()
     const m = enLine.match(/\(([^)]+)\)\s*$/)
     if (m) {
+      const answer = m[1]
+      // 한국어 힌트에 답이 노출되지 않도록 정답 단어를 ( )로 교체
+      const raw_ko = lines[0].trim()
+      const answerRe = new RegExp(answer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')
+      const hint_ko = raw_ko.replace(answerRe, '( )')
       return {
-        hint_ko: lines[0].trim(),
-        question: enLine.slice(0, enLine.lastIndexOf(`(${m[1]}`)).trim(),
-        answer: m[1]
+        hint_ko,
+        question: enLine.slice(0, enLine.lastIndexOf(`(${answer}`)).trim(),
+        answer
       }
     }
   }
@@ -78,7 +83,7 @@ function speakCorrection(word) {
 }
 
 // ─── 음성 인식 퀴즈 ───────────────────────────────────────────────────────────
-function VoiceQuiz({ text, quizStatus, onResult }) {
+function VoiceQuiz({ text, grammarTip, quizStatus, onResult }) {
   const { hint_ko, question, answer } = parseG(text)
   const hasSR = !!(window.SpeechRecognition || window.webkitSpeechRecognition)
   const [mode, setMode] = useState(hasSR ? 'voice' : 'text')
@@ -165,9 +170,18 @@ function VoiceQuiz({ text, quizStatus, onResult }) {
       <p className="text-sm text-gray-700 mb-4 whitespace-pre-wrap">{question}</p>
 
       {wrongFeedback && (
-        <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 mb-3 text-xs text-red-600">
-          ❌ 틀렸어요! 정답 발음을 들어보세요 🔊
-          {lastHeard && <span className="block text-gray-400 mt-0.5">들린 말: "{lastHeard}"</span>}
+        <div className="flex flex-col gap-2 mb-3">
+          <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs text-red-600">
+            <p>❌ 틀렸어요! 정답 발음을 들어보세요 🔊</p>
+            <p className="font-bold font-mono mt-1 text-red-700">정답: {answer}</p>
+            {lastHeard && <p className="text-gray-400 mt-0.5">내가 입력한 답: "{lastHeard}"</p>}
+          </div>
+          {grammarTip && (
+            <div className="bg-orange-50 border border-orange-200 rounded-xl px-3 py-2 text-xs text-orange-700">
+              <p className="font-bold mb-1">💡 왜 이 답일까요?</p>
+              <p className="leading-relaxed whitespace-pre-wrap">{grammarTip}</p>
+            </div>
+          )}
         </div>
       )}
 
@@ -315,6 +329,7 @@ function SentenceCard({ item, quizStatus, onQuizResult }) {
       {b.G && (
         <VoiceQuiz
           text={b.G}
+          grammarTip={safeStr(b.D) || null}
           quizStatus={quizStatus}
           onResult={onQuizResult}
         />

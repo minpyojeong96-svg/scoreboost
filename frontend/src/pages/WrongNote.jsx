@@ -19,11 +19,11 @@ function parseG(text = '') {
     const enLine = lines.slice(1).join(' ').trim()
     const m = enLine.match(/\(([^)]+)\)\s*$/)
     if (m) {
-      return {
-        hint_ko: lines[0].trim(),
-        question: enLine.slice(0, enLine.lastIndexOf(`(${m[1]}`)).trim(),
-        answer: m[1]
-      }
+      const answer = m[1]
+      const raw_ko = lines[0].trim()
+      const answerRe = new RegExp(answer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')
+      const hint_ko = raw_ko.replace(answerRe, '( )')
+      return { hint_ko, question: enLine.slice(0, enLine.lastIndexOf(`(${answer}`)).trim(), answer }
     }
   }
   const m = text.match(/\(([^)]+)\)\s*$/)
