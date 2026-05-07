@@ -42,6 +42,10 @@ router.post('/send', async (req, res, next) => {
       score = 0,
       total_problems = 0,
       correct_count = 0,
+      attitude_score = null,
+      attitude_label = '',
+      avg_time_spent = 0,
+      revealed_count = 0,
       studied_tags = [],
       studied_sentences = [],
       wrong_items = [],
@@ -69,14 +73,19 @@ router.post('/send', async (req, res, next) => {
       ? studied_sentences.map(s => `• ${s}`).join('\n')
       : ''
 
+    const attitudeLine = attitude_score !== null
+      ? `${attitude_label} (${attitude_score}점) — 평균 ${avg_time_spent}초/문제${revealed_count > 0 ? ` · 정답보기 ${revealed_count}회` : ''}`
+      : null
+
     const text = [
-      '📊 <b>오늘 학습 결과</b>',
+      '🎓 <b>오늘 학습 완료!</b>',
       '━━━━━━━━━━━━━━',
       `👤 ${name}`,
       `📅 ${today}`,
       `⏱ 학습시간: ${study_minutes}분`,
       `📝 풀이: ${total_problems}문제 중 ${correct_count}개 정답`,
       `✅ 점수: ${score}점`,
+      ...(attitudeLine ? [`📊 학습태도: ${attitudeLine}`] : []),
       '',
       '📚 <b>오늘 학습한 문법</b>',
       `• ${studiedTagLine}`,

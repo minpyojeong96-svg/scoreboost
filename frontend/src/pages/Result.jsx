@@ -89,18 +89,25 @@ function VoiceQuiz({ text, grammarTip, quizStatus, onResult }) {
   const [mode, setMode] = useState(hasSR ? 'voice' : 'text')
   const [listening, setListening] = useState(false)
   const [voiceAttempts, setVoiceAttempts] = useState(0)
-  const [textAttempts, setTextAttempts] = useState(0)
   const [lastHeard, setLastHeard] = useState('')
   const [textInput, setTextInput] = useState('')
   const [wrongFeedback, setWrongFeedback] = useState(false)
   const recRef = useRef(null)
+  const startTimeRef = useRef(Date.now())
+  const wrongCountRef = useRef(0)
   const MAX_VOICE = 5
+
+  const getStats = () => ({
+    timeSpent: Math.round((Date.now() - startTimeRef.current) / 1000),
+    wrongCount: wrongCountRef.current
+  })
 
   const handleAnswer = (heard, isVoice) => {
     if (normalize(heard) === normalize(answer)) {
       setWrongFeedback(false)
-      onResult('correct', answer, heard)
+      onResult('correct', answer, heard, getStats())
     } else {
+      wrongCountRef.current += 1
       setWrongFeedback(true)
       setLastHeard(heard)
       speakCorrection(answer)
@@ -109,9 +116,8 @@ function VoiceQuiz({ text, grammarTip, quizStatus, onResult }) {
         setVoiceAttempts(next)
         if (next >= MAX_VOICE) setTimeout(() => setMode('text'), 1800)
       } else {
-        // 텍스트 오답 → 오답 처리 후 다음으로 이동 가능
         setTextInput('')
-        onResult('wrong', answer, heard)
+        onResult('wrong', answer, heard, getStats())
       }
     }
   }
@@ -139,7 +145,7 @@ function VoiceQuiz({ text, grammarTip, quizStatus, onResult }) {
 
   const reveal = () => {
     speakCorrection(answer)
-    onResult('revealed', answer, '')
+    onResult('revealed', answer, '', getStats())
   }
 
   if (quizStatus === 'correct') return (
@@ -353,6 +359,7 @@ export default function Result() {
   const [results, setResults] = useState([])
   const [sidx, setSidx] = useState(0)
   const [quizMap, setQuizMap] = useState({})
+  const [quizStats, setQuizStats] = useState({}) // { [id]: { timeSpent, wrongCount } }
   const [autoExplain, setAutoExplain] = useState(null)
   const [name, setName] = useState('')
   const [sending, setSending] = useState(false)
@@ -427,8 +434,9 @@ export default function Result() {
     if (scrollRef.current) scrollRef.current.scrollTop = 0
   }
 
-  const handleQuizResult = async (status, correctAnswer, userInput) => {
+  const handleQuizResult = async (status, correctAnswer, userInput, stats = {}) => {
     setQuizMap(prev => ({ ...prev, [cur.id]: status }))
+    setQuizStats(prev => ({ ...prev, [cur.id]: stats }))
 
     if (status !== 'correct') {
       setAutoExplain({ userInput, correctAnswer })
@@ -464,6 +472,39 @@ export default function Result() {
     ? Math.round((correctCount / quizSentences.length) * 100)
     : 0
 
+  // ─── 학습태도 점수 계산 ────────────────────────────────────────────────────
+  const attitudeScore = (() => {
+    if (!quizSentences.length) return null
+    let total = 0
+    quizSentences.forEach(r => {
+      const status = quizMap[r.id]
+      if (!status) return
+      const { timeSpent = 0, wrongCount = 0 } = quizStats[r.id] || {}
+      if (status === 'revealed') { total += 10; return }
+      let s = 100
+      if (timeSpent < 3)        s -= 40  // 찍기 의심
+      else if (timeSpent > 120) s -= 30  // 자리 비움 의심
+      else if (timeSpent > 60)  s -= 15
+      else if (timeSpent > 30)  s -= 5
+      s -= Math.min(wrongCount * 15, 50)
+      total += Math.max(10, s)
+    })
+    return Math.round(total / quizSentences.length)
+  })()
+
+  const attitudeInfo = attitudeScore === null ? null
+    : attitudeScore >= 90 ? { label: '최우수', emoji: '🌟', color: 'text-yellow-500', bg: 'bg-yellow-50 border-yellow-200' }
+    : attitudeScore >= 70 ? { label: '성실', emoji: '👍', color: 'text-green-600', bg: 'bg-green-50 border-green-200' }
+    : attitudeScore >= 50 ? { label: '보통', emoji: '📚', color: 'text-blue-600', bg: 'bg-blue-50 border-blue-200' }
+    : { label: '노력 필요', emoji: '💪', color: 'text-orange-500', bg: 'bg-orange-50 border-orange-200' }
+
+  const avgTimeSpent = (() => {
+    const times = quizSentences.map(r => quizStats[r.id]?.timeSpent).filter(Boolean)
+    return times.length ? Math.round(times.reduce((a, b) => a + b, 0) / times.length) : 0
+  })()
+
+  const revealedCount = Object.values(quizMap).filter(v => v === 'revealed').length
+
   const handleSend = async () => {
     setSending(true)
     try {
@@ -492,6 +533,10 @@ export default function Result() {
         score,
         total_problems: quizSentences.length,
         correct_count: correctCount,
+        attitude_score: attitudeScore,
+        attitude_label: attitudeInfo?.label || '',
+        avg_time_spent: avgTimeSpent,
+        revealed_count: revealedCount,
         studied_tags: studiedTags,
         studied_sentences: studiedSentences,
         wrong_items: wrongItems,
@@ -592,45 +637,64 @@ export default function Result() {
           />
         )}
 
-        {/* 점수 + 텔레그램 전송 */}
+        {/* 학습 결과 카드 */}
         {allAttempted && !sent && (
-          <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 flex flex-col gap-3">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-indigo-600">{score}점</p>
-              <p className="text-sm text-gray-500">{correctCount}개 정답 / {quizSentences.length}문제</p>
+          <div className="flex flex-col gap-3">
+            {/* 점수 */}
+            <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-200 text-center">
+              <p className="text-xs text-indigo-400 font-bold mb-1">오늘의 점수</p>
+              <p className="text-4xl font-bold text-indigo-600">{score}점</p>
+              <p className="text-sm text-gray-500 mt-1">{correctCount}개 정답 / {quizSentences.length}문제</p>
             </div>
-            {user ? (
-              <>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  placeholder="이름 입력 (선택)"
-                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
-                />
-                <button
-                  onClick={handleSend}
-                  disabled={sending}
-                  className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold disabled:opacity-60"
-                >
-                  {sending ? '전송 중...' : '📲 텔레그램으로 전송'}
-                </button>
-                <p className="text-xs text-center text-gray-400">
-                  텔레그램 ID 미설정 시 프로필에서 먼저 입력해주세요
-                </p>
-              </>
-            ) : (
-              <p className="text-xs text-center text-gray-400">
-                로그인하면 텔레그램으로 결과를 전송할 수 있어요
-              </p>
+
+            {/* 학습태도 점수 */}
+            {attitudeInfo && (
+              <div className={`p-4 rounded-2xl border ${attitudeInfo.bg} flex flex-col gap-2`}>
+                <p className="text-xs font-bold text-gray-500">학습태도</p>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">{attitudeInfo.emoji}</span>
+                    <div>
+                      <p className={`text-lg font-bold ${attitudeInfo.color}`}>{attitudeInfo.label}</p>
+                      <p className="text-xs text-gray-400">{attitudeScore}점</p>
+                    </div>
+                  </div>
+                  <div className="text-right text-xs text-gray-500 space-y-0.5">
+                    <p>⏱ 평균 {avgTimeSpent}초/문제</p>
+                    <p>✅ 스스로 {correctCount + (Object.values(quizMap).filter(v=>v==='wrong').length)}문제 도전</p>
+                    {revealedCount > 0 && <p>📖 정답 보기 {revealedCount}회</p>}
+                  </div>
+                </div>
+              </div>
             )}
+
+            {/* 이름 입력 + 학습 끝내기 버튼 */}
+            <input
+              type="text"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="이름 입력 (선택)"
+              className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
+            />
+            <button
+              onClick={handleSend}
+              disabled={sending}
+              className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold text-base disabled:opacity-60 shadow-lg"
+            >
+              {sending ? '전송 중...' : '🎓 오늘의 학습 끝내기'}
+            </button>
           </div>
         )}
 
         {sent && (
-          <div className="p-4 bg-green-50 rounded-2xl border border-green-200 text-center">
-            <p className="text-green-700 font-bold">✅ 텔레그램으로 전송됐습니다!</p>
-            <button onClick={() => navigate('/')} className="mt-2 text-sm text-indigo-600 underline">
+          <div className="p-5 bg-green-50 rounded-2xl border border-green-200 text-center flex flex-col gap-2">
+            <p className="text-3xl">🎉</p>
+            <p className="text-green-700 font-bold text-base">오늘 학습 완료!</p>
+            <p className="text-xs text-green-600">결과가 선생님께 전송됐어요</p>
+            <button
+              onClick={() => navigate('/')}
+              className="mt-2 w-full py-3 bg-indigo-600 text-white rounded-xl font-bold"
+            >
               홈으로 돌아가기
             </button>
           </div>
