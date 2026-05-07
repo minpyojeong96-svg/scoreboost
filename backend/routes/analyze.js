@@ -104,6 +104,39 @@ async function callGPT(sentence, hasPattern) {
   return JSON.parse(data.choices[0].message.content)
 }
 
+// ── 퀴즈 블록 단독 생성 (매번 새 문장으로, 캐시 안 함) ──────────────────────
+async function generateFreshQuiz(sentence, blocks) {
+  try {
+    const hint = [
+      blocks.A ? `해석: ${blocks.A}` : '',
+      blocks.D ? `문법 포인트: ${blocks.D}` : ''
+    ].filter(Boolean).join('\n')
+
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        max_tokens: 150,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: '영어 문법 퀴즈 출제 전문가. JSON { "G": "..." } 형식으로만 답해.' },
+          {
+            role: 'user',
+            content: `원본 문장: "${sentence}"\n${hint}\n\n이 문장의 핵심 문법 패턴으로 완전히 새로운 문장을 만들어 핵심 단어 하나를 ___ 빈칸으로 만든 문제 1개. 원본 문장을 그대로 쓰면 안 됨. 마지막에 반드시 (정답단어) 형식. 예: My brother ___ his car every weekend. (washes)`
+          }
+        ]
+      })
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    const parsed = JSON.parse(data.choices[0].message.content)
+    return typeof parsed.G === 'string' ? parsed.G : null
+  } catch {
+    return null
+  }
+}
+
 // ── 메인 분석 함수 ────────────────────────────────────────────────────────────
 async function analyzeSentence(sentence) {
   const trimmed = sentence.trim()
@@ -115,12 +148,14 @@ async function analyzeSentence(sentence) {
     .eq('sentence', trimmed)
     .maybeSingle()
   if (exact) {
+    // 캐시 히트여도 퀴즈는 매번 새로 생성 (변별력 확보)
+    const freshG = await generateFreshQuiz(exact.sentence, exact.blocks || {})
     return {
       id: exact.id,
       sentence: exact.sentence,
       translation: exact.translation,
       grammar_tags: exact.grammar_tags,
-      blocks: exact.blocks,
+      blocks: { ...exact.blocks, G: freshG || exact.blocks?.G },
       source: 'exact_hit',
       cached: true
     }
@@ -130,14 +165,15 @@ async function analyzeSentence(sentence) {
   const embedding = await getEmbedding(trimmed)
 
   // 2. 벡터 유사도 캐시 히트 확인 (90%+ = 재사용)
-  const cached = await findCachedSentence(embedding)
-  if (cached) {
+  const cachedRow = await findCachedSentence(embedding)
+  if (cachedRow) {
+    const freshG = await generateFreshQuiz(cachedRow.sentence, cachedRow.blocks || {})
     return {
-      id: cached.id,
-      sentence: cached.sentence,
-      translation: cached.translation,
-      grammar_tags: cached.grammar_tags,
-      blocks: cached.blocks,
+      id: cachedRow.id,
+      sentence: cachedRow.sentence,
+      translation: cachedRow.translation,
+      grammar_tags: cachedRow.grammar_tags,
+      blocks: { ...cachedRow.blocks, G: freshG || cachedRow.blocks?.G },
       source: 'db_hit',
       cached: true
     }
@@ -158,10 +194,10 @@ async function analyzeSentence(sentence) {
     if (pattern.blocks.F && !blocks.F) blocks.F = pattern.blocks.F
   }
 
-  // 6. AI 자동 검수 (생성 직후 GPT-4o가 다시 확인)
+  // 6. AI 자동 검수
   const review = await autoReview(trimmed, result.translation, blocks)
 
-  // 7. DB 저장
+  // 7. DB 저장 (review_passed/review_issues 컬럼은 스키마에 없으므로 제외)
   const { data: saved, error } = await supabase
     .from('sentences')
     .insert({
@@ -172,9 +208,7 @@ async function analyzeSentence(sentence) {
       blocks,
       pattern_id: pattern?.id || null,
       trust_score: review.passed ? 0.9 : 0.5,
-      source: hasPattern ? 'pattern_hit' : 'ai_generated',
-      review_passed: review.passed,
-      review_issues: review.issues
+      source: hasPattern ? 'pattern_hit' : 'ai_generated'
     })
     .select('id')
     .single()
@@ -188,9 +222,7 @@ async function analyzeSentence(sentence) {
     grammar_tags: result.grammar_tags || [],
     blocks,
     source: hasPattern ? 'pattern_hit' : 'ai_generated',
-    cached: false,
-    review_passed: review.passed,
-    review_issues: review.issues
+    cached: false
   }
 }
 
