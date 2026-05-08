@@ -332,14 +332,18 @@ function SentenceCard({ item, quizStatus, onQuizResult }) {
       )}
 
       {/* G: 퀴즈 */}
-      {b.G && (
+      {b.G && parseG(b.G).answer ? (
         <VoiceQuiz
           text={b.G}
           grammarTip={safeStr(b.D) || null}
           quizStatus={quizStatus}
           onResult={onQuizResult}
         />
-      )}
+      ) : b.G ? (
+        <div className="rounded-2xl border-2 border-gray-200 bg-gray-50 p-4 text-center">
+          <p className="text-sm text-gray-400">퀴즈 문제를 불러오지 못했어요. 다음 문장으로 넘어가주세요.</p>
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -627,6 +631,7 @@ export default function Result() {
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 min-h-0 flex flex-col gap-4">
         {cur && (
           <SentenceCard
+            key={cur.id}
             item={cur}
             quizStatus={quizMap[cur.id]}
             onQuizResult={(status, correctAnswer, userInput) =>
